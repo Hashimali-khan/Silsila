@@ -1,0 +1,1 @@
+"""Gemini embedding service."""
