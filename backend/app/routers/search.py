@@ -1,5 +1,4 @@
-"""Hybrid search endpoints."""
-
+"""Stub routers — implemented in later phases."""
 from fastapi import APIRouter
 
-router = APIRouter(prefix="/search", tags=["Search"])
+router = APIRouter()

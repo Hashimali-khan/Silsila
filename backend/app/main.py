@@ -1,10 +1,99 @@
 """FastAPI application entry point."""
 
-from fastapi import FastAPI
+import logging
+import time
+import uuid
 
-app = FastAPI(title="Silsila Backend API", version="0.1.0")
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
+
+from app.config import settings
+from app.db.connection import get_pool, close_pool
+from app.routers import parse, search, chat, analytics, investigate, alias_suggestions
+
+logger = logging.getLogger(__name__)
 
 
-@app.get("/health")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Startup: open DB pool. Shutdown: close pool."""
+    logger.info("Starting Silsila API — %s", settings.ENVIRONMENT)
+    await get_pool()
+    logger.info("Database pool ready")
+
+    # Sentry init (Phase 6 — no-op if DSN is empty)
+    if settings.SENTRY_DSN:
+        import sentry_sdk
+        sentry_sdk.init(
+            dsn=settings.SENTRY_DSN,
+            traces_sample_rate=0.2,
+            environment=settings.ENVIRONMENT,
+        )
+        logger.info("Sentry initialized")
+
+    yield
+
+    await close_pool()
+    logger.info("Database pool closed")
+
+
+app = FastAPI(
+    title="Silsila API",
+    version="1.0.0",
+    description="AI Memory Engine — relationship intelligence from your chats",
+    lifespan=lifespan,
+    docs_url="/docs" if not settings.is_production else None,
+    redoc_url=None,
+)
+
+# ── Middleware ────────────────────────────────────────────────────────────────
+
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.allowed_origins_list,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
+    allow_headers=["Authorization", "Content-Type"],
+)
+
+
+@app.middleware("http")
+async def request_logging_middleware(request: Request, call_next) -> Response:
+    request_id = str(uuid.uuid4())[:8]
+    start = time.perf_counter()
+    response: Response = await call_next(request)
+    duration_ms = round((time.perf_counter() - start) * 1000)
+    logger.info(
+        "request",
+        extra={
+            "request_id": request_id,
+            "method": request.method,
+            "path": request.url.path,
+            "status": response.status_code,
+            "duration_ms": duration_ms,
+        },
+    )
+    response.headers["X-Request-ID"] = request_id
+    return response
+
+
+# ── Routes ────────────────────────────────────────────────────────────────────
+
+app.include_router(parse.router, prefix="/api", tags=["ingestion"])
+app.include_router(search.router, prefix="/api", tags=["search"])
+app.include_router(chat.router, prefix="/api", tags=["chat"])
+app.include_router(analytics.router, prefix="/api", tags=["analytics"])
+app.include_router(investigate.router, prefix="/api", tags=["investigate"])
+app.include_router(alias_suggestions.router, prefix="/api", tags=["aliases"])
+
+
+@app.get("/api/health", tags=["ops"])
 async def health_check():
-    return {"status": "ok"}
+    """UptimeRobot keep-alive + DB connectivity check."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.fetchval("SELECT 1")
+    return {"status": "ok", "environment": settings.ENVIRONMENT}

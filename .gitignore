@@ -1,19 +1,41 @@
-# Environment variables & secrets
+# =============================================================
+# Silsila AI Memory Engine — .gitignore
+# Stack: FastAPI (Heroku) + Next.js (Vercel) + Postgres + Qdrant
+# =============================================================
+
+# ── Secrets & Environment ─────────────────────────────────────
 .env
+.env.local
+.env.*.local
+.env.development
+.env.production
+.env.staging
 .env.*
-!.env.example
+!.env.example          # keep the template
+
+# Clerk CLI
+.clerk/
+
+# Stitch / agent temp files
 .agents/
 stitch_result.json
+design_stitch/*.json
 
-# Python
+# ── Heroku ────────────────────────────────────────────────────
+.heroku/
+
+# ── Python ────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
+*.pyd
 .Python
+
+# Build / packaging
 build/
-develop-eggs/
 dist/
+develop-eggs/
 downloads/
 eggs/
 .eggs/
@@ -26,30 +48,114 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
+
+# Testing & coverage
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
-.mypy_cache/
+.tox/
+.nox/
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
 
-# Virtual Environments
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pytype/
+.pyre/
+
+# Virtual environments
 .venv/
 venv/
 env/
 ENV/
+env.bak/
+venv.bak/
 
-# Node & Next.js / Frontend
+# Jupyter (Phase 3+ analysis)
+.ipynb_checkpoints/
+*.ipynb
+
+# GLiNER model cache (pre-downloaded in Dockerfile, not in repo)
+backend/.gliner_cache/
+*.bin
+*.safetensors
+*.onnx
+
+# ── Node & Frontend ───────────────────────────────────────────
 node_modules/
 .next/
 out/
 .turbo/
+.vercel/
+.swc/
+*.tsbuildinfo
+next-env.d.ts
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+*.pem
 
-# Uploads & Temporary files
+# Frontend build artifacts
+frontend/dist/
+frontend/build/
+
+# Package manager lockfile conflicts (keep only one)
+# Uncomment if you only use npm:
+# yarn.lock
+# pnpm-lock.yaml
+
+# ── Database / Migrations ────────────────────────────────────
+# Never ignore migrations — they must be committed
+# backend/migrations/  <-- intentionally NOT ignored
+
+# Postgres / SQLite local dev artifacts
+*.sqlite3
+*.db
+dump.sql
+*.dump
+
+# ── Uploads & Temp ────────────────────────────────────────────
 uploads/
 temp/
+tmp/
 *.log
+*.log.*
+*.tmp
 
-# OS & IDE Files
+# WhatsApp export test files (personal data — never commit)
+*.txt
+!backend/tests/fixtures/*.txt    # keep test fixture exports (sanitized only)
+*.zip
+!backend/tests/fixtures/*.zip
+
+# ── OS & IDE ─────────────────────────────────────────────────
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+desktop.ini
+
 .vscode/
+!.vscode/extensions.json    # share recommended extensions
+!.vscode/settings.json      # share project settings
 .idea/
+*.swp
+*.swo
+*~
+
+# ── CI / CD ───────────────────────────────────────────────────
+# Keep .github/ committed — CI workflows belong in repo
+
+# ── Supabase (legacy — not used in ADR stack) ─────────────────
+supabase/.temp/
+supabase/seed.sql            # may contain real data
