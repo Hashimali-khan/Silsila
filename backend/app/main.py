@@ -8,10 +8,15 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+
+from app.limiter import limiter
 
 from app.config import settings
 from app.db.connection import get_pool, close_pool
-from app.routers import parse, search, chat, analytics, investigate, alias_suggestions, insights
+from app.routers import parse, search, chat, analytics, investigate, alias_suggestions, insights, account
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +52,10 @@ app = FastAPI(
     docs_url="/docs" if not settings.is_production else None,
     redoc_url=None,
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 # ── Middleware ────────────────────────────────────────────────────────────────
 
@@ -89,6 +98,7 @@ app.include_router(analytics.router, prefix="/api", tags=["analytics"])
 app.include_router(investigate.router, prefix="/api", tags=["investigate"])
 app.include_router(alias_suggestions.router, prefix="/api", tags=["aliases"])
 app.include_router(insights.router, prefix="/api", tags=["insights"])
+app.include_router(account.router, prefix="/api", tags=["account"])
 
 
 @app.get("/api/health", tags=["ops"])

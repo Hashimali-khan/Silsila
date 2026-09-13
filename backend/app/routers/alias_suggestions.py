@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 import asyncpg
 
 from app.db.connection import get_pool, set_rls_user
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user_id
 
 router = APIRouter(prefix="/aliases", tags=["aliases"])
 
@@ -21,7 +21,11 @@ class ResolveSuggestionRequest(BaseModel):
     person_id: Optional[str] = None # required if action is "approve" or "new_person" if existing is provided
 
 @router.get("/suggestions", response_model=List[AliasSuggestionResponse])
-async def get_suggestions(request: Request, user_id: str = Depends(get_current_user)):
+async def list_unresolved_aliases(
+    request: Request,
+    chat_id: str = Query(...),
+    user_id: str = Depends(get_current_user_id)
+) -> Dict[str, Any]:
     """Get all pending alias suggestions for the user."""
     pool: asyncpg.Pool = request.app.state.pool
     async with pool.acquire() as conn:
@@ -36,7 +40,7 @@ async def resolve_suggestion(
     suggestion_id: str, 
     payload: ResolveSuggestionRequest,
     request: Request, 
-    user_id: str = Depends(get_current_user)
+    user_id: str = Depends(get_current_user_id)
 ):
     """Resolve an alias suggestion (approve, reject, new)."""
     pool: asyncpg.Pool = request.app.state.pool

@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from app.db.connection import get_db_pool
+from app.db.connection import get_pool
 from app.services.sentiment import sentiment_service
 from app.services.event_detector import event_detector
 from app.db.queries.sentiment import (
@@ -18,7 +18,7 @@ async def process_chat_sentiment_background(chat_id: str, user_id: str):
     to avoid hitting LLM API rate limits.
     """
     logger.info(f"Starting background sentiment analysis for chat {chat_id}")
-    pool = await get_db_pool()
+    pool = await get_pool()
     
     BATCH_SIZE = 20
     # Wait 10 seconds between batches to respect rate limits (Gemini free tier has 15 RPM)

@@ -6,6 +6,7 @@ import asyncio
 from groq import AsyncGroq
 from google import genai
 from google.genai import types as genai_types
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from app.config import settings
 
@@ -102,6 +103,11 @@ class LLMService:
         else:
             yield json.dumps({"type": "error", "content": "No LLM configured."})
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=2, min=2, max=8),
+        reraise=True
+    )
     async def generate_json(
         self,
         prompt: str,

@@ -9,6 +9,7 @@ from app.db.connection import get_pool
 from app.services.hybrid_search import hybrid_search
 from app.services.evidence_builder import build_evidence
 from app.services.llm import llm_service
+from app.limiter import limiter
 
 router = APIRouter()
 
@@ -18,6 +19,7 @@ class ChatQueryRequest(BaseModel):
     person_id: Optional[str] = None
 
 @router.post("/chat")
+@limiter.limit("10/minute")
 async def chat_endpoint(
     request: Request,
     body: ChatQueryRequest,

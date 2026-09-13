@@ -5,13 +5,14 @@ import uuid
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File, status, Request
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
 from app.db.connection import get_pool
 from app.dependencies import get_current_user_id
 from app.workers.ingestion import run_ingestion
+from app.limiter import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +38,9 @@ class JobStatusResponse(BaseModel):
 
 
 @router.post("/parse/whatsapp", response_model=UploadResponse, status_code=status.HTTP_202_ACCEPTED)
+@limiter.limit("5/minute")
 async def upload_whatsapp(
+    request: Request,
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     user_id: str = Depends(get_current_user_id),

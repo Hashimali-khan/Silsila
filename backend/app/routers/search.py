@@ -3,12 +3,13 @@
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from app.db.connection import get_pool, set_rls_user
 from app.db.queries.search import keyword_search, keyword_search_count
 from app.dependencies import get_current_user_id
+from app.limiter import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,9 @@ class SearchResponse(BaseModel):
 
 
 @router.get("/search", response_model=SearchResponse)
+@limiter.limit("30/minute")
 async def search_messages(
+    request: Request,
     chat_id: str = Query(..., description="UUID of the chat to search within"),
     q: str = Query(..., min_length=1, max_length=200, description="Search query"),
     limit: int = Query(50, ge=1, le=100),

@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "Silsila API"
     ENVIRONMENT: str = "development"
     SECRET_KEY: str = "change-me-in-production"
-    ALLOWED_ORIGINS: str = "http://localhost:3000"
+    FRONTEND_URL: str = "http://localhost:3000"
 
     # Database (Heroku Postgres)
     DATABASE_URL: str
@@ -51,7 +51,7 @@ class Settings(BaseSettings):
 
     @property
     def allowed_origins_list(self) -> list[str]:
-        return [o.strip() for o in self.ALLOWED_ORIGINS.split(",")]
+        return [o.strip() for o in self.FRONTEND_URL.split(",")]
 
     class Config:
         env_file = ".env"

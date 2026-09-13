@@ -13,6 +13,7 @@ from qdrant_client.models import (
 )
 
 from app.config import settings
+from app.services.privacy import privacy_service
 
 logger = logging.getLogger(__name__)
 
@@ -59,11 +60,8 @@ class QdrantService:
     def _apply_privacy_noise(self, vector: List[float]) -> List[float]:
         """
         Applies SPARSE differential privacy noise. 
-        Will be fully implemented in Step 25 (Phase 6).
-        For now, returns the vector unchanged.
         """
-        # TODO: Implement Mahalanobis noise from privacy.py (Phase 6)
-        return vector
+        return privacy_service.apply_noise(vector)
 
     def _generate_bm25_sparse_vector(self, text: str) -> SparseVector:
         """

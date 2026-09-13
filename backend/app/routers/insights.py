@@ -2,19 +2,19 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from typing import List, Dict, Any
 
-from app.auth import get_current_user
+from app.dependencies import get_current_user_id
 from app.db.connection import get_pool
 from app.db.queries.sentiment import get_emotion_trajectory
 from app.db.queries.events import get_events
 from app.services.insights import insights_service
 
-router = APIRouter(prefix="/api/insights", tags=["insights"])
+router = APIRouter(prefix="/insights", tags=["insights"])
 
 
 @router.get("/{chat_id}/emotions")
 async def get_chat_emotions(
     chat_id: str,
-    user_id: str = Depends(get_current_user)
+    user_id: str = Depends(get_current_user_id)
 ) -> List[Dict[str, Any]]:
     """
     Get aggregated emotion trajectory over time for the Emotion Graph.
@@ -33,7 +33,7 @@ async def get_chat_emotions(
 @router.get("/{chat_id}/events")
 async def get_chat_events(
     chat_id: str,
-    user_id: str = Depends(get_current_user)
+    user_id: str = Depends(get_current_user_id)
 ) -> List[Dict[str, Any]]:
     """
     Get all detected life events for a chat.
@@ -51,7 +51,7 @@ async def get_chat_events(
 @router.get("/{chat_id}/memory-cards")
 async def get_chat_memory_cards(
     chat_id: str,
-    user_id: str = Depends(get_current_user)
+    user_id: str = Depends(get_current_user_id)
 ) -> Dict[str, Any]:
     """
     Get memory cards (First Conversation, Longest Silence, etc.) for a chat.
@@ -69,7 +69,7 @@ async def get_chat_memory_cards(
 @router.get("/{chat_id}/story")
 async def get_chat_story(
     chat_id: str,
-    user_id: str = Depends(get_current_user)
+    user_id: str = Depends(get_current_user_id)
 ) -> Dict[str, Any]:
     """
     Get the 5-chapter story mode narrative for a chat.

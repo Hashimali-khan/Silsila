@@ -61,7 +61,7 @@ async def test_batch_upsert(mock_qdrant_service):
             "message_ids": ["msg_1", "msg_2"]
         }
     ]
-    dense_embeddings = [[0.1, 0.2, 0.3]]
+    dense_embeddings = [[0.1] * 1024]
     
     await service.batch_upsert(chunks, dense_embeddings)
     
