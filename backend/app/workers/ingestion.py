@@ -25,6 +25,12 @@ import asyncpg
 from app.db.connection import get_pool, set_rls_user
 from app.services.whatsapp_parser import parse_whatsapp_export, extract_unique_senders
 from app.services.thread_detector import detect_threads, get_thread_stats
+from app.services.chunk_builder import process_chat_chunks
+from app.services.embedding import VoyageAIClient, record_token_usage
+from app.services.qdrant_client import qdrant_service
+from app.services.entity_extractor import entity_extractor
+from app.services.coreference import process_extracted_entities
+from app.services.graph_builder import build_person_profile
 
 logger = logging.getLogger(__name__)
 
@@ -282,6 +288,121 @@ async def run_ingestion(
                     },
                 },
             )
+
+        # ── STEP 5.1: Chunking ────────────────────────────────────────────────
+        await _update_job(pool, job_id, user_id, current_step="chunking")
+        
+        async with pool.acquire() as conn:
+            await set_rls_user(conn, user_id)
+            
+            # Get all threads and messages for this chat
+            thread_records = await conn.fetch("SELECT id FROM public.conversation_threads WHERE chat_id = $1 ORDER BY start_time ASC", chat_id)
+            thread_ids = [r["id"] for r in thread_records]
+            
+            threads_msgs = []
+            for tid in thread_ids:
+                msg_records = await conn.fetch(
+                    """
+                    SELECT m.*, m.id as _db_id
+                    FROM public.messages m
+                    JOIN public.message_threads mt ON m.id = mt.message_id
+                    WHERE mt.thread_id = $1
+                    ORDER BY m.timestamp ASC
+                    """, tid
+                )
+                threads_msgs.append([dict(r) for r in msg_records])
+                
+            chunks = await process_chat_chunks(conn, user_id, chat_id, threads_msgs, [str(tid) for tid in thread_ids])
+            await _update_job(pool, job_id, user_id, total_chunks=len(chunks))
+            logger.info("Job %s: created %d chunks", job_id, len(chunks))
+
+        # ── STEP 5.2: Embedding & Qdrant Upsert ───────────────────────────────
+        if chunks:
+            await _update_job(pool, job_id, user_id, current_step="embedding")
+            
+            voyage_client = VoyageAIClient()
+            await qdrant_service.ensure_collection()
+            
+            CHUNK_BATCH_SIZE = 128
+            embedded_chunks = 0
+            
+            async with pool.acquire() as conn:
+                await set_rls_user(conn, user_id)
+                for i in range(0, len(chunks), CHUNK_BATCH_SIZE):
+                    batch = chunks[i : i + CHUNK_BATCH_SIZE]
+                    texts = [c["content"] for c in batch]
+                    
+                    try:
+                        embeddings, tokens = await voyage_client.embed_batch(texts)
+                        await record_token_usage(conn, user_id, job_id, tokens)
+                        
+                        # Add metadata for Qdrant
+                        for c in batch:
+                            c["user_id"] = user_id
+                            c["chat_id"] = chat_id
+                            
+                        await qdrant_service.batch_upsert(batch, embeddings)
+                        
+                        embedded_chunks += len(batch)
+                        await _update_job(pool, job_id, user_id, embedded_chunks=embedded_chunks)
+                    except Exception as e:
+                        logger.error(f"Failed to embed and upsert chunk batch: {e}")
+                        # Depending on resilience requirements, might want to fail the job or continue
+                        raise
+
+            logger.info("Job %s: embedded and upserted %d chunks", job_id, embedded_chunks)
+
+        # ── STEP 5.3: Entity Extraction ───────────────────────────────────────
+        await _update_job(pool, job_id, user_id, current_step="entity_extraction")
+
+        async with pool.acquire() as conn:
+            await set_rls_user(conn, user_id)
+            
+            # We process non_system messages in batches
+            EXTRACT_BATCH_SIZE = 10
+            extracted_messages = 0
+            
+            for i in range(0, len(non_system), EXTRACT_BATCH_SIZE):
+                batch = non_system[i : i + EXTRACT_BATCH_SIZE]
+                
+                # Filter batch to only messages that pass the heuristic
+                flagged_messages = []
+                for msg in batch:
+                    if entity_extractor.heuristic_scan(msg["content"]):
+                        flagged_messages.append(msg)
+                        
+                if not flagged_messages:
+                    continue
+                    
+                # Extract entities for the flagged messages
+                texts = [m["content"] for m in flagged_messages]
+                batch_entities = await entity_extractor.extract_entities_batch(texts)
+                
+                # Process the extracted entities
+                for msg, entities in zip(flagged_messages, batch_entities):
+                    if entities:
+                        await process_extracted_entities(
+                            pool=pool, 
+                            user_id=user_id, 
+                            chat_id=chat_id, 
+                            message_id=msg["_db_id"], 
+                            content=msg["content"], 
+                            entities=entities
+                        )
+                
+                extracted_messages += len(flagged_messages)
+                
+            logger.info("Job %s: extracted entities from %d flagged messages", job_id, extracted_messages)
+
+        # ── STEP 5.4: Build People Profiles ───────────────────────────────────
+        await _update_job(pool, job_id, user_id, current_step="people_profiles")
+        
+        # We don't need a connection here as build_person_profile manages its own
+        for sender, person_id in person_map.items():
+            try:
+                await build_person_profile(pool, user_id, person_id, chat_id)
+            except Exception as e:
+                logger.error("Job %s: failed to build profile for person %s: %s", job_id, person_id, e)
 
         # ── STEP 6: Complete ──────────────────────────────────────────────────
         await _update_job(

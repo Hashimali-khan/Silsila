@@ -41,6 +41,9 @@ class Settings(BaseSettings):
 
     # Sentry (optional — Phase 6)
     SENTRY_DSN: str = ""
+    
+    # Entity Extraction
+    USE_LLM_EXTRACTOR: bool = False  # Set to True to use Gemini for entity extraction (saves ~1GB RAM for Heroku)
 
     @property
     def is_production(self) -> bool:
