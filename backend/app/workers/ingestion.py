@@ -178,6 +178,7 @@ async def run_ingestion(
                 for msg in batch:
                     msg_id = str(uuid.uuid4())
                     person_id = person_map.get(msg["sender_name"])
+                    import json as _json
                     records.append((
                         msg_id,
                         user_id,
@@ -188,7 +189,7 @@ async def run_ingestion(
                         msg["content"],
                         msg["is_system_msg"],
                         msg["is_media"],
-                        msg["is_deleted"],
+                        _json.dumps({"is_deleted": msg["is_deleted"]}),
                     ))
                     # Store msg_id back for thread step
                     msg["_db_id"] = msg_id

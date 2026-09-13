@@ -1,11 +1,13 @@
-"""Parse router — WhatsApp file upload endpoint."""
+"""Parse router — WhatsApp file upload endpoint + SSE job progress stream."""
 
+import asyncio
 import uuid
 import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File, status
 from pydantic import BaseModel
+from sse_starlette.sse import EventSourceResponse
 
 from app.db.connection import get_pool
 from app.dependencies import get_current_user_id
@@ -131,3 +133,66 @@ async def get_job_status(
     if not row:
         raise HTTPException(status_code=404, detail="Job not found.")
     return JobStatusResponse(**dict(row))
+
+
+@router.get("/parse/jobs/{job_id}/stream")
+async def stream_job_progress(
+    job_id: str,
+    user_id: str = Depends(get_current_user_id),
+):
+    """
+    Server-Sent Events stream for real-time ingestion progress.
+
+    Emits a JSON event every second with current job status until
+    the job reaches 'complete' or 'failed'. The frontend subscribes
+    to this endpoint for live progress bar updates.
+
+    Event format:  data: {status, current_step, total_messages, processed_messages, chat_id}
+    """
+    pool = await get_pool()
+
+    # Verify job ownership before streaming
+    row = await pool.fetchrow(
+        "SELECT id FROM public.ingestion_jobs WHERE id = $1 AND user_id = $2",
+        job_id,
+        user_id,
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Job not found.")
+
+    async def event_generator():
+        terminal_states = {"complete", "failed"}
+        poll_interval = 1.0  # seconds between DB polls
+        max_polls = 600       # timeout after 10 minutes
+
+        for _ in range(max_polls):
+            record = await pool.fetchrow(
+                """SELECT status, current_step, total_messages,
+                          processed_messages, error_message, chat_id::text
+                   FROM public.ingestion_jobs
+                   WHERE id = $1""",
+                job_id,
+            )
+            if not record:
+                yield {"event": "error", "data": '{"error": "Job not found"}'}
+                return
+
+            import json
+            data = json.dumps({
+                "status": record["status"],
+                "current_step": record["current_step"],
+                "total_messages": record["total_messages"],
+                "processed_messages": record["processed_messages"],
+                "error_message": record["error_message"],
+                "chat_id": record["chat_id"],
+            })
+            yield {"event": "progress", "data": data}
+
+            if record["status"] in terminal_states:
+                return
+
+            await asyncio.sleep(poll_interval)
+
+        yield {"event": "error", "data": '{"error": "Stream timeout"}'}
+
+    return EventSourceResponse(event_generator())

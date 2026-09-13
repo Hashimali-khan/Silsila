@@ -53,6 +53,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+        extra = "ignore"  # ignore unknown env vars (e.g. CLERK_PUBLISHABLE_KEY for frontend)
 
 
 @lru_cache
