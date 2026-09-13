@@ -11,7 +11,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 
 from app.config import settings
 from app.db.connection import get_pool, close_pool
-from app.routers import parse, search, chat, analytics, investigate, alias_suggestions
+from app.routers import parse, search, chat, analytics, investigate, alias_suggestions, insights
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +88,7 @@ app.include_router(chat.router, prefix="/api", tags=["chat"])
 app.include_router(analytics.router, prefix="/api", tags=["analytics"])
 app.include_router(investigate.router, prefix="/api", tags=["investigate"])
 app.include_router(alias_suggestions.router, prefix="/api", tags=["aliases"])
+app.include_router(insights.router, prefix="/api", tags=["insights"])
 
 
 @app.get("/api/health", tags=["ops"])

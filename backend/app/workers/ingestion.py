@@ -31,6 +31,7 @@ from app.services.qdrant_client import qdrant_service
 from app.services.entity_extractor import entity_extractor
 from app.services.coreference import process_extracted_entities
 from app.services.graph_builder import build_person_profile
+from app.workers.analytics import process_chat_sentiment_background
 
 logger = logging.getLogger(__name__)
 
@@ -415,6 +416,10 @@ async def run_ingestion(
             processed_messages=total_inserted,
         )
         logger.info("Job %s: complete. chat_id=%s", job_id, chat_id)
+        
+        # ── STEP 7: Trigger Phase 4 Analytics ─────────────────────────────────
+        # Run slowly in the background without holding up this ingestion task
+        asyncio.create_task(process_chat_sentiment_background(chat_id, user_id))
 
     except Exception as exc:
         logger.exception("Job %s failed: %s", job_id, exc)
