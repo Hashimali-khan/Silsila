@@ -16,13 +16,11 @@ class EmbeddingError(Exception):
 
 class VoyageAIClient:
     def __init__(self):
-        self.api_key = getattr(settings, "voyage_api_key", None)
-        self.model = getattr(settings, "voyage_model", "voyage-4")
+        self.api_key = getattr(settings, "VOYAGE_API_KEY", None)
+        self.model = getattr(settings, "VOYAGE_MODEL", "voyage-4/")
         if not self.api_key:
-            logger.warning("VOYAGE_API_KEY is not set. Embeddings will fail.")
-            self.client = None
-        else:
-            self.client = voyageai.AsyncClient(api_key=self.api_key)
+            raise ValueError("VOYAGE_API_KEY is not set. Embeddings will fail.")
+        self.client = voyageai.AsyncClient(api_key=self.api_key)
 
     @retry(
         wait=wait_exponential(multiplier=2, min=2, max=8),

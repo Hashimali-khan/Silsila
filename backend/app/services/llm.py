@@ -28,10 +28,13 @@ class LLMService:
         self.groq_key = getattr(settings, "GROQ_API_KEY", None)
         self.gemini_key = getattr(settings, "GEMINI_API_KEY", None)
         
+        if not self.groq_key and not self.gemini_key:
+            raise ValueError("At least one LLM API key (GROQ_API_KEY or GEMINI_API_KEY) must be configured.")
+        
         self.groq_client = AsyncGroq(api_key=self.groq_key) if self.groq_key else None
         self.gemini_client = genai.Client(api_key=self.gemini_key) if self.gemini_key else None
         
-        self.groq_model = getattr(settings, "GROQ_MODEL", "llama-3.3-70b-versatile")
+        self.groq_model = getattr(settings, "GROQ_MODEL", "openai/gpt-oss-120b")
         self.gemini_model = getattr(settings, "GEMINI_FLASH_MODEL", "gemini-2.5-flash")
 
     async def stream_answer(
@@ -114,7 +117,7 @@ class LLMService:
         response_schema: Any = None
     ) -> Dict[str, Any]:
         """
-        Generates structured JSON using Gemini Flash (best for structured tasks).
+        Generates structured JSON using Gemini (best for structured tasks).
         """
         if not self.gemini_client:
             raise ValueError("Gemini API key not configured. Gemini is required for structured JSON generation.")

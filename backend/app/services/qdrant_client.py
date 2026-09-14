@@ -25,10 +25,8 @@ class QdrantService:
         self.dim = getattr(settings, "VOYAGE_EMBEDDING_DIM", 1024)
         
         if not self.url or not self.api_key:
-            logger.warning("QDRANT_URL or QDRANT_API_KEY not set. Vector operations will fail.")
-            self.client = None
-        else:
-            self.client = AsyncQdrantClient(url=self.url, api_key=self.api_key)
+            raise ValueError("QDRANT_URL or QDRANT_API_KEY not set. Vector operations will fail.")
+        self.client = AsyncQdrantClient(url=self.url, api_key=self.api_key)
 
     async def ensure_collection(self):
         """Creates the collection if it doesn't exist, with both dense and sparse vectors."""

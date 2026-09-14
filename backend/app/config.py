@@ -22,7 +22,7 @@ class Settings(BaseSettings):
 
     # Voyage AI — embeddings ONLY, no fallback provider
     VOYAGE_API_KEY: str
-    VOYAGE_MODEL: str = "voyage-4"
+    VOYAGE_MODEL: str = "voyage-4/"
     VOYAGE_EMBEDDING_DIM: int = 1024
     VOYAGE_TOKEN_BUDGET: int = 200_000_000  # 200M one-time grant
 
@@ -33,7 +33,7 @@ class Settings(BaseSettings):
 
     # Groq — primary LLM
     GROQ_API_KEY: str
-    GROQ_MODEL: str = "llama-3.3-70b-versatile"
+    GROQ_MODEL: str = "openai/gpt-oss-120b"
 
     # Gemini — fallback LLM + entity suggestion only
     GEMINI_API_KEY: str

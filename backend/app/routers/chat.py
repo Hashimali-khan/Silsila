@@ -5,7 +5,7 @@ from sse_starlette.sse import EventSourceResponse
 import json
 
 from app.dependencies import get_current_user_id
-from app.db.connection import get_pool
+from app.db.connection import get_pool, set_rls_user
 from app.services.hybrid_search import hybrid_search
 from app.services.evidence_builder import build_evidence
 from app.services.llm import llm_service
@@ -50,6 +50,7 @@ async def chat_endpoint(
         
         # 2. Build Evidence
         async with pool.acquire() as conn:
+            await set_rls_user(conn, user_id)
             evidence_blocks = await build_evidence(
                 conn=conn,
                 user_id=user_id,

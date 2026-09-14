@@ -11,9 +11,10 @@ async def test_embed_batch_success():
         mock_response.total_tokens = 10
         mock_instance.embed = AsyncMock(return_value=mock_response)
         
-        client = VoyageAIClient()
-        client.client = mock_instance
-        client.api_key = "test_key"
+        with patch("app.services.embedding.settings") as mock_settings:
+            mock_settings.VOYAGE_API_KEY = "test_key"
+            client = VoyageAIClient()
+            client.client = mock_instance
         embeddings, tokens = await client.embed_batch(["test text 1", "test text 2"])
         
         assert embeddings == [[0.1, 0.2, 0.3]]
@@ -22,9 +23,10 @@ async def test_embed_batch_success():
 @pytest.mark.asyncio
 async def test_embed_batch_empty():
     with patch("app.services.embedding.voyageai.AsyncClient"):
-        client = VoyageAIClient()
-        client.api_key = "test_key"
-        client.client = MagicMock()
+        with patch("app.services.embedding.settings") as mock_settings:
+            mock_settings.VOYAGE_API_KEY = "test_key"
+            client = VoyageAIClient()
+            client.client = MagicMock()
         embeddings, tokens = await client.embed_batch([])
         assert embeddings == []
         assert tokens == 0
@@ -38,9 +40,10 @@ async def test_embed_batch_truncation():
         mock_response.total_tokens = 10
         mock_instance.embed = AsyncMock(return_value=mock_response)
         
-        client = VoyageAIClient()
-        client.client = mock_instance
-        client.api_key = "test_key"
+        with patch("app.services.embedding.settings") as mock_settings:
+            mock_settings.VOYAGE_API_KEY = "test_key"
+            client = VoyageAIClient()
+            client.client = mock_instance
         texts = ["text"] * 150 # Exceeds BATCH_SIZE (128)
         
         with patch("app.services.embedding.logger") as mock_logger:
