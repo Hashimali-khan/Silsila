@@ -14,15 +14,50 @@ export const metadata: Metadata = {
   },
 };
 
+import { Outfit, Manrope } from "next/font/google";
+
+const fontOutfit = Outfit({
+  subsets: ["latin"],
+  variable: "--font-outfit",
+});
+
+const fontManrope = Manrope({
+  subsets: ["latin"],
+  variable: "--font-manrope",
+});
+
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <ClerkProvider>
-      <html lang="en" className="h-full">
-        <body className="h-full antialiased">
+    <ClerkProvider
+      appearance={{
+        variables: {
+          colorPrimary: '#EA580C',
+          colorBackground: '#ffffff',
+          colorText: '#0F172A',
+          colorTextSecondary: '#475569',
+          fontFamily: 'var(--font-manrope)',
+          borderRadius: '1rem',
+        },
+        elements: {
+          card: "rounded-[1.35rem] shadow-warm-xl border border-surface-border bg-white backdrop-blur-xl",
+          headerTitle: "font-display font-extrabold text-2xl tracking-tight text-on-surface",
+          headerSubtitle: "text-on-surface-subtle",
+          formButtonPrimary: "bg-primary hover:bg-primary-hover shadow-btn-primary transition-all font-bold",
+          socialButtonsBlockButton: "border-surface-border hover:bg-surface-muted transition-colors text-on-surface font-semibold rounded-xl",
+          socialButtonsBlockButtonText: "font-semibold",
+          dividerText: "text-on-surface-subtle",
+          formFieldLabel: "text-on-surface-variant font-semibold",
+          formFieldInput: "rounded-xl border-surface-border focus:border-primary focus:ring-primary/20",
+          footerActionLink: "text-primary hover:text-primary-hover font-bold",
+        }
+      }}
+    >
+      <html lang="en" className={`h-full ${fontOutfit.variable} ${fontManrope.variable}`}>
+        <body className="h-full antialiased font-body text-on-surface bg-background min-h-screen selection:bg-primary/15 selection:text-primary">
           {children}
         </body>
       </html>

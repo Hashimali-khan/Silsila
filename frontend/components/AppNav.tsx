@@ -2,109 +2,92 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { UserButton } from "@clerk/nextjs";
+import { UserButton, SignInButton, useAuth } from "@clerk/nextjs";
 
 const NAV_LINKS = [
-  { href: "/", label: "Dashboard", icon: "⊞" },
-  { href: "/upload", label: "Upload", icon: "↑" },
+  { href: "/", label: "Dashboard" },
+  { href: "/upload", label: "Upload" },
 ];
 
 export function AppNav() {
   const pathname = usePathname();
+  const { isLoaded, userId } = useAuth();
 
   return (
-    <header
-      style={{
-        background: "var(--surface)",
-        borderBottom: "1px solid var(--border)",
-        position: "sticky",
-        top: 0,
-        zIndex: 50,
-        height: "60px",
-        display: "flex",
-        alignItems: "center",
-        padding: "0 1.5rem",
-        gap: "1rem",
-      }}
-    >
-      {/* Logo */}
-      <Link
-        href="/"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "0.5rem",
-          textDecoration: "none",
-          marginRight: "1rem",
-        }}
-      >
-        <span
-          style={{
-            width: "28px",
-            height: "28px",
-            background: "var(--orange-600)",
-            borderRadius: "8px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: "14px",
-          }}
-        >
-          🔗
-        </span>
-        <span
-          style={{
-            fontFamily: "'Plus Jakarta Sans', sans-serif",
-            fontWeight: 700,
-            fontSize: "1.1rem",
-            color: "var(--text-primary)",
-            letterSpacing: "-0.02em",
-          }}
-        >
-          Silsila
-        </span>
-      </Link>
+    <header className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-xl border-b border-surface-border">
+      <div className="max-w-7xl mx-auto h-16 px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+        {/* Brand Logo */}
+        <Link href="/" className="flex items-center gap-3 group">
+          <div className="w-10 h-10 rounded-[12px] bg-gradient-to-br from-primary to-amber-accent flex items-center justify-center text-white shadow-warm-md group-hover:shadow-warm-lg transition-all duration-300 transform group-hover:-rotate-3 group-hover:scale-105">
+            <svg
+              className="w-5 h-5 stroke-white fill-none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2.5"
+              viewBox="0 0 24 24"
+            >
+              <circle cx="9" cy="12" r="5" />
+              <circle cx="15" cy="12" r="5" />
+            </svg>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="font-display font-black text-2xl tracking-tighter text-on-surface">
+              Silsila <span className="text-primary opacity-80 font-extrabold">AI</span>
+            </span>
+            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-muted/50 border border-surface-border shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)] backdrop-blur-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+              <span className="text-[10px] font-extrabold tracking-widest uppercase text-on-surface-variant font-body">
+                Relationship AI
+              </span>
+            </div>
+          </div>
+        </Link>
 
-      {/* Nav links */}
-      <nav style={{ display: "flex", gap: "0.25rem", flex: 1 }}>
-        {NAV_LINKS.map((link) => (
-          <Link
-            key={link.href}
-            href={link.href}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.375rem",
-              padding: "0.375rem 0.875rem",
-              borderRadius: "var(--radius-md)",
-              textDecoration: "none",
-              fontSize: "0.875rem",
-              fontWeight: 500,
-              background:
-                pathname === link.href
-                  ? "var(--orange-50)"
-                  : "transparent",
-              color:
-                pathname === link.href
-                  ? "var(--orange-700)"
-                  : "var(--text-secondary)",
-              transition: "all 0.15s ease",
-            }}
-          >
-            <span style={{ fontSize: "0.9rem" }}>{link.icon}</span>
-            {link.label}
-          </Link>
-        ))}
-      </nav>
-
-      {/* User */}
-      <UserButton
-        appearance={{
-          elements: {
-            avatarBox: { width: "32px", height: "32px" },
-          },
-        }}
-      />
+        {/* Navigation & Auth Actions */}
+        <div className="flex items-center gap-4">
+          {isLoaded && userId ? (
+            <>
+              <nav className="hidden md:flex items-center gap-1.5 p-1 rounded-full bg-surface-muted border border-surface-border mr-2">
+                {NAV_LINKS.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                      pathname === link.href
+                        ? "bg-primary text-white shadow-warm-sm"
+                        : "text-on-surface hover:text-primary"
+                    }`}
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </nav>
+              <UserButton
+                appearance={{
+                  elements: {
+                    avatarBox: { width: "36px", height: "36px" },
+                  },
+                }}
+              />
+            </>
+          ) : isLoaded && !userId ? (
+            <>
+              <SignInButton mode="modal">
+                <button className="text-sm font-bold text-on-surface hover:text-primary transition-colors px-4 py-2">
+                  Log In
+                </button>
+              </SignInButton>
+              <SignInButton mode="modal">
+                <button className="hidden sm:inline-flex bg-primary hover:bg-primary-hover text-white text-sm font-bold px-5 py-2 rounded-full shadow-btn-primary transition-all">
+                  Get Started
+                </button>
+              </SignInButton>
+            </>
+          ) : (
+            <div className="w-8 h-8 rounded-full bg-surface-muted animate-pulse"></div>
+          )}
+        </div>
+      </div>
     </header>
   );
 }
