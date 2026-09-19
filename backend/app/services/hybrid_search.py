@@ -1,4 +1,5 @@
 import logging
+import asyncio
 from typing import List, Dict, Any, Optional
 
 from qdrant_client.models import (
@@ -58,25 +59,28 @@ async def hybrid_search(
 
     # 4. Perform Qdrant query with Prefetch and RRF
     try:
-        results = await qdrant_service.client.query_points(
-            collection_name=qdrant_service.collection_name,
-            prefetch=[
-                Prefetch(
-                    query=sparse_query,
-                    using="sparse",
-                    limit=limit * 2,
-                    filter=query_filter
-                ),
-                Prefetch(
-                    query=dense_query,
-                    using="dense",
-                    limit=limit * 2,
-                    filter=query_filter
-                )
-            ],
-            query=FusionQuery(fusion=Fusion.RRF),
-            limit=limit,
-            with_payload=True
+        results = await asyncio.wait_for(
+            qdrant_service.client.query_points(
+                collection_name=qdrant_service.collection_name,
+                prefetch=[
+                    Prefetch(
+                        query=sparse_query,
+                        using="sparse",
+                        limit=limit * 2,
+                        filter=query_filter
+                    ),
+                    Prefetch(
+                        query=dense_query,
+                        using="dense",
+                        limit=limit * 2,
+                        filter=query_filter
+                    )
+                ],
+                query=FusionQuery(fusion=Fusion.RRF),
+                limit=limit,
+                with_payload=True
+            ),
+            timeout=3.0
         )
 
         # 5. Format results
