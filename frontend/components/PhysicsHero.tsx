@@ -1,4 +1,5 @@
 "use client";
+import { ArrowRight } from "lucide-react";
 
 import { useEffect, useRef } from "react";
 import { SignUpButton } from "@clerk/nextjs";
@@ -15,12 +16,26 @@ export function PhysicsHero() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    let width = (canvas.width = container.clientWidth);
-    let height = (canvas.height = container.clientHeight);
+    const dpr = window.devicePixelRatio || 1;
+
+    let width = container.clientWidth;
+    let height = container.clientHeight;
+
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    ctx.scale(dpr, dpr);
 
     const handleResize = () => {
-      width = canvas.width = container.clientWidth;
-      height = canvas.height = container.clientHeight;
+      width = container.clientWidth;
+      height = container.clientHeight;
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+      ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform
+      ctx.scale(dpr, dpr);
     };
     window.addEventListener("resize", handleResize);
 
@@ -284,7 +299,7 @@ export function PhysicsHero() {
           <SignUpButton mode="modal">
             <button className="bg-primary hover:bg-primary-hover text-white font-display font-bold px-8 py-4 rounded-full shadow-btn-primary hover:scale-105 active:scale-95 transition-all flex items-center gap-2 text-base sm:text-lg">
               <span>Get Started</span>
-              <span className="material-symbols-outlined text-[20px]">arrow_forward</span>
+              <ArrowRight size={20} />
             </button>
           </SignUpButton>
         </div>

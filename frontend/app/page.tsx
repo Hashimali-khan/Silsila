@@ -5,6 +5,7 @@ import { formatDateShort, formatNumber } from "@/lib/utils";
 import { AppNav } from "@/components/AppNav";
 import { PhysicsHero } from "@/components/PhysicsHero";
 import Link from "next/link";
+import { CloudUpload, AlertCircle, MessageSquare, Sparkles, Plus, FileArchive, Lock, ArrowRight, ShieldCheck, Zap, Headphones, Bug, Mail } from "lucide-react";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -65,7 +66,7 @@ export default async function DashboardPage() {
                 href="/upload"
                 className="bg-primary hover:bg-primary-hover text-white font-display font-bold text-sm px-6 py-3 rounded-full shadow-btn-primary hover:scale-105 active:scale-95 transition-all flex items-center gap-2 self-start md:self-auto"
               >
-                <span className="material-symbols-outlined text-[20px]">cloud_upload</span>
+                <CloudUpload size={20} />
                 <span>Upload New Chat</span>
               </Link>
             )}
@@ -73,7 +74,7 @@ export default async function DashboardPage() {
 
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-red-700 mb-8 text-sm font-medium flex items-center gap-2 shadow-warm-sm">
-              <span className="material-symbols-outlined">error</span>
+              <AlertCircle size={24} />
               {error}
             </div>
           )}
@@ -87,20 +88,20 @@ export default async function DashboardPage() {
                     
                     {/* Floating background decorative elements */}
                     <div className="absolute top-10 left-10 text-orange-200/50 animate-float" style={{ animationDelay: '0s' }}>
-                      <span className="material-symbols-outlined text-[60px] rotate-[-15deg]">forum</span>
+                      <MessageSquare size={60} className="rotate-[-15deg]" />
                     </div>
                     <div className="absolute bottom-10 right-10 text-emerald-200/40 animate-float" style={{ animationDelay: '2s' }}>
-                      <span className="material-symbols-outlined text-[80px] rotate-[10deg]">auto_awesome</span>
+                      <Sparkles size={80} className="rotate-[10deg]" />
                     </div>
                     
                     <div className="relative mb-8 z-10">
                       {/* Pulsing Core */}
                       <div className="absolute inset-0 rounded-full animate-pulse-ring"></div>
                       <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-gradient-to-br from-orange-50 to-orange-100 border border-orange-200 flex items-center justify-center text-primary group-hover:scale-110 transition-transform duration-500 shadow-warm-md relative z-10">
-                        <span className="material-symbols-outlined text-[50px] sm:text-[60px]">cloud_upload</span>
+                        <CloudUpload className="w-[50px] h-[50px] sm:w-[60px] sm:h-[60px]" />
                       </div>
                       <div className="absolute -bottom-2 -right-2 w-10 h-10 rounded-full bg-teal-accent text-white flex items-center justify-center shadow-md z-20 group-hover:-translate-y-2 group-hover:translate-x-2 transition-transform duration-500">
-                        <span className="material-symbols-outlined text-[24px]">add</span>
+                        <Plus size={24} />
                       </div>
                     </div>
                     
@@ -114,10 +115,10 @@ export default async function DashboardPage() {
                     
                     <div className="flex flex-wrap items-center justify-center gap-3 mt-8 relative z-10">
                       <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-surface-muted/80 backdrop-blur-sm text-xs font-bold text-on-surface border border-surface-border shadow-warm-sm group-hover:bg-white transition-colors">
-                        <span className="material-symbols-outlined text-[16px] text-primary">folder_zip</span>.ZIP archive
+                        <FileArchive size={16} className="text-primary" />.ZIP archive
                       </span>
                       <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-emerald-50/80 backdrop-blur-sm text-teal-accent border border-emerald-200 text-xs font-bold shadow-warm-sm group-hover:bg-emerald-50 transition-colors">
-                        <span className="material-symbols-outlined text-[16px]">lock</span>100% Client Encrypted
+                        <Lock size={16} />100% Client Encrypted
                       </span>
                     </div>
                   </div>
@@ -185,7 +186,7 @@ export default async function DashboardPage() {
                       <div className="mt-auto pt-2 flex items-center justify-between text-xs font-bold text-on-surface-subtle tracking-wider uppercase">
                         <span>Last: {formatDateShort(chat.last_message_at)}</span>
                         <span className="flex items-center gap-1 group-hover:translate-x-2 transition-transform duration-300" style={{ color: accent }}>
-                          Enter <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                          Enter <ArrowRight size={16} />
                         </span>
                       </div>
                     </div>
@@ -234,10 +235,10 @@ function PremiumFooter() {
             </p>
             <div className="flex items-center gap-4">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800 text-xs font-bold text-slate-300 border border-slate-700">
-                <span className="material-symbols-outlined text-[16px] text-teal-400">verified_user</span> 100% Private
+                <ShieldCheck size={16} className="text-teal-400" /> 100% Private
               </span>
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800 text-xs font-bold text-slate-300 border border-slate-700">
-                <span className="material-symbols-outlined text-[16px] text-primary">bolt</span> Lightning Fast
+                <Zap size={16} className="text-primary" /> Lightning Fast
               </span>
             </div>
           </div>
@@ -255,9 +256,9 @@ function PremiumFooter() {
           <div>
             <h4 className="font-display font-bold text-white mb-4 tracking-wide">Connect</h4>
             <ul className="space-y-3">
-              <li><a href="#" className="text-slate-400 hover:text-white transition-colors text-sm font-medium flex items-center gap-2"><span className="material-symbols-outlined text-[18px]">support_agent</span> Help Center</a></li>
-              <li><a href="#" className="text-slate-400 hover:text-white transition-colors text-sm font-medium flex items-center gap-2"><span className="material-symbols-outlined text-[18px]">bug_report</span> Report Issue</a></li>
-              <li><a href="#" className="text-slate-400 hover:text-white transition-colors text-sm font-medium flex items-center gap-2"><span className="material-symbols-outlined text-[18px]">mail</span> Contact Us</a></li>
+              <li><a href="#" className="text-slate-400 hover:text-white transition-colors text-sm font-medium flex items-center gap-2"><Headphones size={18} /> Help Center</a></li>
+              <li><a href="#" className="text-slate-400 hover:text-white transition-colors text-sm font-medium flex items-center gap-2"><Bug size={18} /> Report Issue</a></li>
+              <li><a href="#" className="text-slate-400 hover:text-white transition-colors text-sm font-medium flex items-center gap-2"><Mail size={18} /> Contact Us</a></li>
             </ul>
           </div>
         </div>

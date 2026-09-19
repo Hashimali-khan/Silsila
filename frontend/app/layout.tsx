@@ -56,7 +56,10 @@ export default function RootLayout({
         }
       }}
     >
-      <html lang="en" className={`h-full ${fontOutfit.variable} ${fontManrope.variable}`}>
+      <html lang="en" className={`h-full ${fontOutfit.variable} ${fontManrope.variable}`} data-scroll-behavior="smooth">
+        <head>
+          <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+        </head>
         <body className="h-full antialiased font-body text-on-surface bg-background min-h-screen selection:bg-primary/15 selection:text-primary">
           {children}
         </body>
