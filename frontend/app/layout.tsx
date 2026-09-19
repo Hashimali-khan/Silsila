@@ -37,8 +37,6 @@ export default function RootLayout({
         variables: {
           colorPrimary: '#EA580C',
           colorBackground: '#ffffff',
-          colorText: '#0F172A',
-          colorTextSecondary: '#475569',
           fontFamily: 'var(--font-manrope)',
           borderRadius: '1rem',
         },

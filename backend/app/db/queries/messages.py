@@ -1,5 +1,4 @@
-"""Message database queries — paginated retrieval for the chat browser."""
-
+from datetime import datetime
 import asyncpg
 from typing import Any
 
@@ -8,7 +7,7 @@ async def get_messages_page(
     conn: asyncpg.Connection,
     chat_id: str,
     limit: int = 100,
-    before_timestamp: str | None = None,
+    before_timestamp: str | datetime | None = None,
 ) -> list[dict[str, Any]]:
     """
     Fetch a page of messages for a chat, ordered newest-first then reversed
@@ -27,7 +26,17 @@ async def get_messages_page(
     Returns:
         List of message dicts ordered chronologically (oldest first for display).
     """
+    ts_val: datetime | None = None
     if before_timestamp:
+        if isinstance(before_timestamp, str):
+            try:
+                ts_val = datetime.fromisoformat(before_timestamp.replace("Z", "+00:00"))
+            except ValueError:
+                ts_val = None
+        elif isinstance(before_timestamp, datetime):
+            ts_val = before_timestamp
+
+    if ts_val is not None:
         rows = await conn.fetch(
             """
             SELECT
@@ -41,12 +50,12 @@ async def get_messages_page(
             FROM public.messages
             WHERE chat_id = $1::uuid
               AND is_system_msg = FALSE
-              AND timestamp < $2::timestamptz
+              AND timestamp < $2
             ORDER BY timestamp DESC
             LIMIT $3
             """,
             chat_id,
-            before_timestamp,
+            ts_val,
             limit,
         )
     else:

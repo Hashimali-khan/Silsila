@@ -1,7 +1,9 @@
-"""asyncpg connection pool for Heroku Postgres with native RLS support."""
-
+import asyncio
+import logging
 import asyncpg
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 _pool: asyncpg.Pool | None = None
 
@@ -9,14 +11,28 @@ _pool: asyncpg.Pool | None = None
 async def get_pool() -> asyncpg.Pool:
     global _pool
     if _pool is None:
-        # Heroku Postgres uses self-signed SSL — require SSL but don't verify cert
-        _pool = await asyncpg.create_pool(
-            dsn=settings.DATABASE_URL,
-            min_size=settings.DATABASE_POOL_MIN,
-            max_size=settings.DATABASE_POOL_MAX,
-            ssl="require",
-            command_timeout=30,
-        )
+        max_retries = 3
+        for attempt in range(1, max_retries + 1):
+            try:
+                # Heroku Postgres uses self-signed SSL — require SSL but don't verify cert
+                _pool = await asyncpg.create_pool(
+                    dsn=settings.DATABASE_URL,
+                    min_size=settings.DATABASE_POOL_MIN,
+                    max_size=settings.DATABASE_POOL_MAX,
+                    ssl="require",
+                    command_timeout=30,
+                )
+                break
+            except Exception as e:
+                logger.warning(
+                    "Database connection attempt %d/%d failed: %s",
+                    attempt,
+                    max_retries,
+                    e,
+                )
+                if attempt == max_retries:
+                    raise
+                await asyncio.sleep(2)
     return _pool
 
 

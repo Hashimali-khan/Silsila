@@ -57,22 +57,81 @@ export default function SearchPage() {
     <div style={{ minHeight: "100vh", background: "var(--background)" }}>
       <AppNav />
 
-      <main style={{ maxWidth: "800px", margin: "0 auto", padding: "2rem 1.5rem" }}>
-        {/* Back link */}
-        <Link
-          href={`/chat/${chatId}`}
+      {/* Chat header bar */}
+      <div
+        style={{
+          background: "var(--surface, #ffffff)",
+          borderBottom: "1px solid var(--border, #e2e8f0)",
+          padding: "0.75rem 1.5rem",
+        }}
+      >
+        <div
           style={{
-            display: "inline-flex",
+            maxWidth: "1000px",
+            margin: "0 auto",
+            display: "flex",
             alignItems: "center",
-            gap: "0.25rem",
-            color: "var(--text-muted)",
-            textDecoration: "none",
-            fontSize: "0.875rem",
-            marginBottom: "1.5rem",
+            justifyContent: "space-between",
           }}
         >
-          ← Back to chat
-        </Link>
+          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+            <Link
+              href={`/chat/${chatId}`}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.375rem",
+                color: "var(--text-secondary, #475569)",
+                textDecoration: "none",
+                fontSize: "0.875rem",
+                fontWeight: 500,
+                background: "var(--stone-100, #f1f5f9)",
+                padding: "0.375rem 0.75rem",
+                borderRadius: "0.5rem",
+              }}
+            >
+              ← Back to Messages
+            </Link>
+          </div>
+
+          <div style={{ display: "flex", gap: "0.75rem" }}>
+            <Link
+              href={`/chat/${chatId}`}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.375rem",
+                fontSize: "0.8125rem",
+                color: "var(--text-secondary)",
+                textDecoration: "none",
+                padding: "0.375rem 0.625rem",
+                borderRadius: "0.375rem",
+              }}
+            >
+              💬 Messages
+            </Link>
+            <Link
+              href={`/chat/${chatId}/qa`}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.375rem",
+                fontSize: "0.8125rem",
+                color: "#ea580c",
+                fontWeight: 600,
+                textDecoration: "none",
+                padding: "0.375rem 0.625rem",
+                borderRadius: "0.375rem",
+                background: "rgba(255, 237, 213, 0.6)",
+              }}
+            >
+              ✨ Ask AI Detective
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      <main style={{ maxWidth: "800px", margin: "0 auto", padding: "2rem 1.5rem" }}>
 
         {/* Search header */}
         <h1

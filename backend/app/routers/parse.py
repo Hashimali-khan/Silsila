@@ -123,13 +123,18 @@ async def get_job_status(
     user_id: str = Depends(get_current_user_id),
 ):
     """Fetch current ingestion job status (polling fallback)."""
+    try:
+        uuid.UUID(job_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid job ID format.")
+
     pool = await get_pool()
     row = await pool.fetchrow(
-        """SELECT id, status, current_step, total_messages,
+        """SELECT id::text AS job_id, status, current_step, total_messages,
                   processed_messages, error_message,
                   chat_id::text
            FROM public.ingestion_jobs
-           WHERE id = $1 AND user_id = $2""",
+           WHERE id = $1::uuid AND user_id = $2""",
         job_id,
         user_id,
     )
@@ -152,11 +157,16 @@ async def stream_job_progress(
 
     Event format:  data: {status, current_step, total_messages, processed_messages, chat_id}
     """
+    try:
+        uuid.UUID(job_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid job ID format.")
+
     pool = await get_pool()
 
     # Verify job ownership before streaming
     row = await pool.fetchrow(
-        "SELECT id FROM public.ingestion_jobs WHERE id = $1 AND user_id = $2",
+        "SELECT id FROM public.ingestion_jobs WHERE id = $1::uuid AND user_id = $2",
         job_id,
         user_id,
     )
@@ -173,7 +183,7 @@ async def stream_job_progress(
                 """SELECT status, current_step, total_messages,
                           processed_messages, error_message, chat_id::text
                    FROM public.ingestion_jobs
-                   WHERE id = $1""",
+                   WHERE id = $1::uuid""",
                 job_id,
             )
             if not record:

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import { AppNav } from "@/components/AppNav";
@@ -21,19 +21,34 @@ type UploadState =
 
 export default function UploadPage() {
   const router = useRouter();
-  const { getToken } = useAuth();
+  const { getToken, isLoaded, isSignedIn } = useAuth();
   const [state, setState] = useState<UploadState>({ phase: "idle" });
   const [dragOver, setDragOver] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
+    };
+  }, []);
 
   const startUpload = useCallback(
     async (file: File) => {
+      if (!isLoaded) return;
+      if (!isSignedIn) {
+        setState({ phase: "error", message: "You must be signed in to upload WhatsApp chats. Please sign in first." });
+        return;
+      }
+
       setState({ phase: "uploading" });
 
       try {
         const token = await getToken();
-        if (!token) throw new Error("Not authenticated");
+        if (!token) throw new Error("Authentication token unavailable. Please refresh or sign in again.");
 
         const formData = new FormData();
         formData.append("file", file);
@@ -51,47 +66,67 @@ export default function UploadPage() {
 
         const { job_id } = await res.json();
 
-        // Start checking job progress
-        subscribeToJobProgress(job_id, token);
+        // Start checking job progress (token is refreshed on every poll tick)
+        subscribeToJobProgress(job_id);
       } catch (e) {
         setState({ phase: "error", message: e instanceof Error ? e.message : "Upload failed" });
       }
     },
-    [getToken],
+    [getToken, isLoaded, isSignedIn],
   );
 
-  const subscribeToJobProgress = (jobId: string, token: string) => {
-    let pollInterval: ReturnType<typeof setInterval> | null = null;
-
-    const startPolling = () => {
-      pollInterval = setInterval(async () => {
-        try {
-          const res = await fetch(`${BACKEND_URL}/api/parse/jobs/${jobId}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          if (!res.ok) return;
-          const job: JobStatus = await res.json();
-          handleJobUpdate(job);
-          if (job.status === "complete" || job.status === "failed") {
-            if (pollInterval) clearInterval(pollInterval);
-          }
-        } catch {
-          // keep polling
-        }
-      }, 1500);
-    };
+  const subscribeToJobProgress = (jobId: string) => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+    }
 
     const handleJobUpdate = (job: JobStatus) => {
       if (job.status === "complete" && job.chat_id) {
         setState({ phase: "done", chatId: job.chat_id });
+        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
         setTimeout(() => router.push(`/chat/${job.chat_id}`), 1500);
         return;
       }
       if (job.status === "failed") {
         setState({ phase: "error", message: job.error_message || "Processing failed" });
+        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
         return;
       }
       setState({ phase: "processing", jobId, status: job });
+    };
+
+    const startPolling = () => {
+      pollIntervalRef.current = setInterval(async () => {
+        try {
+          // Always get a fresh token on every tick — Clerk tokens are short-lived
+          const freshToken = await getToken();
+          if (!freshToken) {
+            console.warn("[polling] getToken() returned null — skipping tick");
+            return;
+          }
+
+          const res = await fetch(`${BACKEND_URL}/api/parse/jobs/${jobId}`, {
+            headers: { Authorization: `Bearer ${freshToken}` },
+          });
+
+          if (res.status === 401) {
+            console.error("[polling] 401 after fresh token — stopping poll");
+            if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+            setState({ phase: "error", message: "Session expired. Please refresh the page and sign in." });
+            return;
+          }
+
+          if (!res.ok) {
+            console.warn(`[polling] Transient error ${res.status}, retrying...`);
+            return;
+          }
+
+          const job: JobStatus = await res.json();
+          handleJobUpdate(job);
+        } catch (err) {
+          console.warn("[polling] Network error, will retry...", err);
+        }
+      }, 2000);
     };
 
     setState({
@@ -161,6 +196,30 @@ export default function UploadPage() {
             
             {/* IDLE DROPZONE */}
             {state.phase === "idle" && (
+              isLoaded && !isSignedIn ? (
+                <motion.div
+                  key="auth-required"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="glass-panel rounded-[2rem] p-10 sm:p-12 text-center border border-surface-border bg-white/80 shadow-warm-md"
+                >
+                  <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mb-5 mx-auto">
+                    <CloudUpload size={32} />
+                  </div>
+                  <h3 className="font-display font-extrabold text-xl sm:text-2xl text-on-surface mb-2">
+                    Sign in to upload chats
+                  </h3>
+                  <p className="text-on-surface-subtle font-medium mb-8 text-sm max-w-sm mx-auto">
+                    Sign in to your account so we can parse and securely link this chat to your personal archive.
+                  </p>
+                  <button
+                    onClick={() => router.push("/sign-in?redirect_url=/upload")}
+                    className="bg-primary hover:bg-primary-hover text-white font-bold py-3 px-8 rounded-full shadow-warm-sm hover:shadow-warm-md hover:-translate-y-0.5 active:translate-y-0 transition-all"
+                  >
+                    Sign In
+                  </button>
+                </motion.div>
+              ) : (
               <motion.div
                 key="idle"
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -228,6 +287,7 @@ export default function UploadPage() {
                   </ol>
                 </div>
               </motion.div>
+              )
             )}
 
             {/* UPLOADING STATE */}

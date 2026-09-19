@@ -3,6 +3,7 @@ import type { ChatDetail, MessagesPageResponse, ChatStats } from "@/lib/types";
 import { AppNav } from "@/components/AppNav";
 import { ChatMessageBrowser } from "./ChatMessageBrowser";
 import { ChatStatsPanel } from "./ChatStatsPanel";
+import { ChatHeader } from "./ChatHeader";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -53,56 +54,13 @@ export default async function ChatPage({
     <div style={{ minHeight: "100vh", background: "var(--background)", display: "flex", flexDirection: "column" }}>
       <AppNav />
 
-      {/* Chat header */}
-      <div
-        style={{
-          background: "var(--surface)",
-          borderBottom: "1px solid var(--border)",
-          padding: "0.875rem 1.5rem",
-          display: "flex",
-          alignItems: "center",
-          gap: "1rem",
-        }}
-      >
-        <Link
-          href="/"
-          style={{
-            color: "var(--text-muted)",
-            textDecoration: "none",
-            fontSize: "0.875rem",
-            display: "flex",
-            alignItems: "center",
-            gap: "0.25rem",
-          }}
-        >
-          ← Back
-        </Link>
-
-        <div style={{ flex: 1 }}>
-          <h1
-            style={{
-              fontFamily: "'Plus Jakarta Sans', sans-serif",
-              fontWeight: 700,
-              fontSize: "1.0625rem",
-              margin: 0,
-              color: "var(--text-primary)",
-            }}
-          >
-            {chat.name}
-          </h1>
-          <p style={{ margin: 0, fontSize: "0.8125rem", color: "var(--text-muted)" }}>
-            {chat.participant_count} participants · {chat.message_count.toLocaleString()} messages
-          </p>
-        </div>
-
-        <Link
-          href={`/chat/${chatId}/search`}
-          className="btn-ghost"
-          style={{ textDecoration: "none", fontSize: "0.875rem" }}
-        >
-          🔍 Search
-        </Link>
-      </div>
+      {/* Chat header & navigation tabs */}
+      <ChatHeader
+        chatId={chatId}
+        chatName={chat.name}
+        participantCount={chat.participant_count}
+        messageCount={chat.message_count}
+      />
 
       {/* Main content area */}
       <div
@@ -132,14 +90,14 @@ export default async function ChatPage({
         {stats && (
           <aside
             style={{
-              width: "300px",
+              width: "320px",
               flexShrink: 0,
               paddingTop: "1.5rem",
               display: "none",
             }}
             className="stats-sidebar"
           >
-            <ChatStatsPanel stats={stats} />
+            <ChatStatsPanel stats={stats} chatId={chatId} />
           </aside>
         )}
       </div>

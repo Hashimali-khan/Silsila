@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     SECRET_KEY: str = "change-me-in-production"
     FRONTEND_URL: str = "http://localhost:3000"
+    ALLOWED_ORIGINS: str = ""
 
     # Database (Heroku Postgres)
     DATABASE_URL: str
@@ -51,7 +52,15 @@ class Settings(BaseSettings):
 
     @property
     def allowed_origins_list(self) -> list[str]:
-        return [o.strip() for o in self.FRONTEND_URL.split(",")]
+        origins = set()
+        if self.FRONTEND_URL:
+            origins.update(o.strip() for o in self.FRONTEND_URL.split(",") if o.strip())
+        if self.ALLOWED_ORIGINS:
+            origins.update(o.strip() for o in self.ALLOWED_ORIGINS.split(",") if o.strip())
+        if not self.is_production:
+            origins.add("http://localhost:3000")
+            origins.add("http://127.0.0.1:3000")
+        return list(origins)
 
     class Config:
         env_file = ".env"

@@ -22,7 +22,8 @@ _jwks_client: PyJWKClient | None = None
 def _get_jwks_client() -> PyJWKClient:
     global _jwks_client
     if _jwks_client is None:
-        jwks_uri = f"{settings.CLERK_JWT_ISSUER}/.well-known/jwks.json"
+        issuer = settings.CLERK_JWT_ISSUER.rstrip("/")
+        jwks_uri = f"{issuer}/.well-known/jwks.json"
         _jwks_client = PyJWKClient(jwks_uri, cache_keys=True)
     return _jwks_client
 
@@ -41,13 +42,19 @@ async def get_current_user_id(
     try:
         client = _get_jwks_client()
         signing_key = client.get_signing_key_from_jwt(token)
+        expected_issuer = settings.CLERK_JWT_ISSUER.rstrip("/")
+
         payload = jwt.decode(
             token,
             signing_key.key,
             algorithms=["RS256"],
-            issuer=settings.CLERK_JWT_ISSUER,
-            options={"verify_aud": False},  # Clerk doesn't set aud by default
+            options={"verify_aud": False},
         )
+
+        token_issuer = str(payload.get("iss", "")).rstrip("/")
+        if expected_issuer and token_issuer != expected_issuer:
+            raise jwt.InvalidIssuerError(f"Issuer mismatch: got {token_issuer}, expected {expected_issuer}")
+
         user_id: str = payload.get("sub", "")
         if not user_id:
             raise ValueError("Missing sub claim")

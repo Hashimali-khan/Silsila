@@ -1,6 +1,7 @@
 """Analytics router — chat list, chat metadata, basic stats, activity charts."""
 
 import logging
+import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -66,6 +67,11 @@ async def get_chat_detail(
     user_id: str = Depends(get_current_user_id),
 ):
     """Get full chat metadata including participant list."""
+    try:
+        uuid.UUID(chat_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid chat ID format.")
+
     pool = await get_pool()
     async with pool.acquire() as conn:
         await set_rls_user(conn, user_id)
@@ -111,6 +117,11 @@ async def get_chat_messages(
     Pass `before` (ISO timestamp) to fetch older messages (scroll up to load more).
     First call: omit `before` to get the most recent messages.
     """
+    try:
+        uuid.UUID(chat_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid chat ID format.")
+
     pool = await get_pool()
     async with pool.acquire() as conn:
         await set_rls_user(conn, user_id)
@@ -167,6 +178,11 @@ async def get_chat_statistics(
     Full analytics for a chat: pre-computed stats + time-series activity.
     Used for the stats section in the chat view.
     """
+    try:
+        uuid.UUID(chat_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid chat ID format.")
+
     pool = await get_pool()
     async with pool.acquire() as conn:
         await set_rls_user(conn, user_id)
@@ -178,16 +194,28 @@ async def get_chat_statistics(
         stats = await get_chat_stats(conn, chat_id)
         daily = await get_messages_per_day(conn, chat_id)
         by_sender = await get_messages_per_sender(conn, chat_id)
+        thread_cnt = await conn.fetchval(
+            "SELECT count(*) FROM public.conversation_threads WHERE chat_id = $1::uuid",
+            chat_id,
+        ) or 0
 
     # Fallback if analysis_cache hasn't been populated yet
     if not stats:
         stats = {
             "total_messages": chat["message_count"],
-            "thread_count": 0,
-            "participants": [],
-            "messages_per_sender": {},
-            "date_range": {},
+            "thread_count": thread_cnt,
+            "participants": [s["sender_name"] for s in by_sender],
+            "messages_per_sender": {s["sender_name"]: s["message_count"] for s in by_sender},
+            "date_range": {
+                "start": chat["first_message_at"].isoformat() if chat.get("first_message_at") else "",
+                "end": chat["last_message_at"].isoformat() if chat.get("last_message_at") else "",
+            },
         }
+    else:
+        if not stats.get("participants"):
+            stats["participants"] = [s["sender_name"] for s in by_sender]
+        if stats.get("thread_count", 0) == 0 and thread_cnt > 0:
+            stats["thread_count"] = thread_cnt
 
     return ChatStatsResponse(
         **stats,
