@@ -341,27 +341,38 @@ async def run_ingestion(
                 await set_rls_user(conn, user_id)
                 for i in range(0, len(chunks), CHUNK_BATCH_SIZE):
                     batch = chunks[i : i + CHUNK_BATCH_SIZE]
-                    texts = [c["content"] for c in batch]
                     
-                    try:
-                        embeddings, tokens = await voyage_client.embed_batch(texts)
-                        await record_token_usage(conn, user_id, job_id, tokens)
+                    # Generate deterministic Qdrant point IDs
+                    for c in batch:
+                        c["user_id"] = user_id
+                        c["chat_id"] = chat_id
+                        # Idempotent ID based on chat and start message
+                        c["_db_id"] = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{chat_id}:{c['start_message_id']}:voyage-3-lite"))
                         
-                        # Add metadata for Qdrant
-                        for c in batch:
-                            c["user_id"] = user_id
-                            c["chat_id"] = chat_id
+                    # Filter out chunks that are already in Qdrant
+                    point_ids = [c["_db_id"] for c in batch]
+                    existing_ids = await qdrant_service.get_existing_point_ids(point_ids)
+                    
+                    chunks_to_embed = [c for c in batch if c["_db_id"] not in existing_ids]
+                    
+                    if chunks_to_embed:
+                        texts = [c["content"] for c in chunks_to_embed]
+                        try:
+                            embeddings, tokens = await voyage_client.embed_batch(texts)
+                            await record_token_usage(conn, user_id, job_id, tokens)
                             
-                        await qdrant_service.batch_upsert(batch, embeddings)
-                        
-                        embedded_chunks += len(batch)
-                        await _update_job(pool, job_id, user_id, embedded_chunks=embedded_chunks)
-                    except Exception as e:
-                        logger.error(f"Failed to embed and upsert chunk batch: {e}")
-                        # Depending on resilience requirements, might want to fail the job or continue
-                        raise
+                            await qdrant_service.batch_upsert(chunks_to_embed, embeddings)
+                            embedded_chunks += len(chunks_to_embed)
+                        except Exception as e:
+                            logger.error(f"Failed to embed and upsert chunk batch: {e}")
+                            raise
+                    
+                    # Also count chunks we skipped as successfully "embedded" for progress tracking
+                    skipped_chunks = len(batch) - len(chunks_to_embed)
+                    embedded_chunks += skipped_chunks
+                    await _update_job(pool, job_id, user_id, embedded_chunks=embedded_chunks)
 
-            logger.info("Job %s: embedded and upserted %d chunks", job_id, embedded_chunks)
+            logger.info("Job %s: processed %d chunks (embedded or skipped)", job_id, embedded_chunks)
 
         # ── STEP 5.3: Entity Extraction ───────────────────────────────────────
         await _update_job(pool, job_id, user_id, current_step="entity_extraction")

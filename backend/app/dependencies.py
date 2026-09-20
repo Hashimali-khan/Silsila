@@ -49,6 +49,7 @@ async def get_current_user_id(
             signing_key.key,
             algorithms=["RS256"],
             options={"verify_aud": False},
+            leeway=60,
         )
 
         token_issuer = str(payload.get("iss", "")).rstrip("/")

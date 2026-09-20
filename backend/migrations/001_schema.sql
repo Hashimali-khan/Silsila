@@ -287,6 +287,22 @@ ALTER TABLE public.events             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.emotion_labels     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.analysis_cache     ENABLE ROW LEVEL SECURITY;
 
+ALTER TABLE public.profiles           FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.chats              FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.people             FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.aliases            FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.messages           FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.conversation_threads FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.message_threads    FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.message_chunks     FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.ingestion_jobs     FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.voyage_token_ledger FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.alias_suggestions  FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.relationships      FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.events             FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.emotion_labels     FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.analysis_cache     FORCE ROW LEVEL SECURITY;
+
 -- Allow superuser / migration user to bypass RLS
 CREATE POLICY "own_data" ON public.profiles
     FOR ALL USING (id = current_setting('app.user_id', true));

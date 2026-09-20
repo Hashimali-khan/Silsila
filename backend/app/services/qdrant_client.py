@@ -73,29 +73,13 @@ class QdrantService:
         """
         return privacy_service.apply_noise(vector)
 
-    def _generate_bm25_sparse_vector(self, text: str) -> SparseVector:
-        """
-        Generates a dummy sparse vector for BM25.
-        In a real scenario, this would use a tokenizer (like fastembed) to generate BM25 indices and weights.
-        For now, we generate a basic sparse vector based on word counts.
-        """
-        from collections import Counter
-        import hashlib
-        
-        # Very basic tokenizer for BM25
-        words = text.lower().split()
-        counts = Counter(words)
-        
-        indices = []
-        values = []
-        for word, count in counts.items():
-            # hash word to index
-            idx = int(hashlib.md5(word.encode()).hexdigest(), 16) % 1000000
-            if idx not in indices:
-                indices.append(idx)
-                values.append(float(count))
-                
-        return SparseVector(indices=indices, values=values)
+    @property
+    def sparse_model(self):
+        if not hasattr(self, '_sparse_model'):
+            from fastembed import SparseTextEmbedding
+            logger.info("Initializing FastEmbed SparseTextEmbedding (Qdrant/bm25)")
+            self._sparse_model = SparseTextEmbedding(model_name="Qdrant/bm25")
+        return self._sparse_model
 
     async def batch_upsert(self, chunks: List[Dict[str, Any]], embeddings: List[List[float]]):
         """
@@ -108,15 +92,21 @@ class QdrantService:
         if len(chunks) != len(embeddings):
             raise ValueError("Number of chunks and embeddings must match.")
             
+        contents = [chunk["content"] for chunk in chunks]
+        sparse_embeddings = list(self.sparse_model.embed(contents))
+            
         points = []
-        for chunk, emb in zip(chunks, embeddings):
+        for chunk, emb, sparse_emb in zip(chunks, embeddings, sparse_embeddings):
             point_id = chunk["_db_id"]
             
             # Apply DP noise
             noised_emb = self._apply_privacy_noise(emb)
             
             # Generate sparse vector
-            sparse_vec = self._generate_bm25_sparse_vector(chunk["content"])
+            sparse_vec = SparseVector(
+                indices=sparse_emb.indices.tolist() if hasattr(sparse_emb.indices, 'tolist') else list(sparse_emb.indices),
+                values=sparse_emb.values.tolist() if hasattr(sparse_emb.values, 'tolist') else list(sparse_emb.values)
+            )
             
             payload = {
                 "user_id": chunk["user_id"],
@@ -146,6 +136,22 @@ class QdrantService:
                 points=points
             )
             logger.info(f"Upserted {len(points)} chunks into Qdrant.")
+
+    async def get_existing_point_ids(self, point_ids: List[str]) -> List[str]:
+        """Returns a list of point IDs that already exist in the collection."""
+        if not self.client or not point_ids:
+            return []
+        try:
+            points = await self.client.retrieve(
+                collection_name=self.collection_name,
+                ids=point_ids,
+                with_payload=False,
+                with_vectors=False
+            )
+            return [str(p.id) for p in points]
+        except Exception as e:
+            logger.warning(f"Failed to retrieve existing Qdrant points: {e}")
+            return []
 
     async def delete_by_chat_id(self, chat_id: str):
         """Deletes all vector points associated with a specific chat_id."""
