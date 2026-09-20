@@ -16,6 +16,7 @@ Phase 2 will add:  chunking → embedding (Voyage) → qdrant upsert
 """
 
 import asyncio
+import json
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -185,7 +186,6 @@ async def run_ingestion(
                 for msg in batch:
                     msg_id = str(uuid.uuid4())
                     person_id = person_map.get(msg["sender_name"])
-                    import json as _json
                     records.append((
                         msg_id,
                         user_id,
@@ -196,7 +196,7 @@ async def run_ingestion(
                         msg["content"],
                         msg["is_system_msg"],
                         msg["is_media"],
-                        _json.dumps({"is_deleted": msg["is_deleted"]}),
+                        json.dumps({"is_deleted": msg["is_deleted"]}),
                     ))
                     # Store msg_id back for thread step
                     msg["_db_id"] = msg_id
@@ -280,6 +280,16 @@ async def run_ingestion(
 
             # Compute basic stats and store in analysis_cache
             msg_per_sender = {s: sum(1 for m in non_system if m["sender_name"] == s) for s in senders}
+            basic_stats_data = {
+                "total_messages": len(non_system),
+                "thread_count": len(threads),
+                "participants": senders,
+                "messages_per_sender": msg_per_sender,
+                "date_range": {
+                    "start": min(timestamps).isoformat(),
+                    "end": max(timestamps).isoformat(),
+                },
+            }
             await conn.execute(
                 """INSERT INTO public.analysis_cache
                    (user_id, chat_id, metric_type, data)
@@ -287,16 +297,7 @@ async def run_ingestion(
                    ON CONFLICT DO NOTHING""",
                 user_id,
                 chat_id,
-                {
-                    "total_messages": len(non_system),
-                    "thread_count": len(threads),
-                    "participants": senders,
-                    "messages_per_sender": msg_per_sender,
-                    "date_range": {
-                        "start": min(timestamps).isoformat(),
-                        "end": max(timestamps).isoformat(),
-                    },
-                },
+                json.dumps(basic_stats_data),
             )
 
         # ── STEP 5.1: Chunking ────────────────────────────────────────────────

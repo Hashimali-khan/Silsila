@@ -7,7 +7,7 @@ import { AppNav } from "@/components/AppNav";
 import { STEP_LABELS, stepProgress } from "@/lib/utils";
 import type { JobStatus } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
-import { CloudUpload, Settings, CheckCircle, AlertTriangle, FileArchive, FileText, Sparkles } from "lucide-react";
+import { CloudUpload, Settings, CheckCircle, AlertTriangle, FileArchive, FileText, Sparkles, ArrowLeft } from "lucide-react";
 
 const BACKEND_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
@@ -169,9 +169,27 @@ export default function UploadPage() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <AppNav />
-      <main className="flex-1 w-full max-w-3xl mx-auto px-4 sm:px-6 py-16 sm:py-24 relative flex flex-col justify-center">
+      <main className="flex-1 w-full max-w-3xl mx-auto px-4 sm:px-6 pt-20 pb-16 relative flex flex-col justify-center">
         {/* Glow behind main container */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-primary/10 blur-[100px] rounded-full pointer-events-none -z-10" />
+
+        {/* Back navigation button */}
+        <div className="mb-6">
+          <button
+            type="button"
+            onClick={() => {
+              if (typeof window !== "undefined" && window.history.length > 1) {
+                router.back();
+              } else {
+                router.push("/");
+              }
+            }}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs md:text-sm font-semibold text-slate-600 bg-white/80 hover:bg-white hover:text-slate-900 border border-surface-border shadow-2xs transition-all cursor-pointer active:scale-95"
+          >
+            <ArrowLeft size={15} />
+            <span>Back</span>
+          </button>
+        </div>
 
         <div className="text-center mb-10">
           <motion.h1 

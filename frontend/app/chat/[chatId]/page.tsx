@@ -51,7 +51,7 @@ export default async function ChatPage({
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--background)", display: "flex", flexDirection: "column" }}>
+    <div className="pt-16 min-h-screen flex flex-col bg-background">
       <AppNav />
 
       {/* Chat header & navigation tabs */}

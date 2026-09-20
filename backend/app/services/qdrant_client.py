@@ -9,7 +9,10 @@ from qdrant_client.models import (
     PointStruct,
     SparseVectorParams,
     SparseIndexParams,
-    SparseVector
+    SparseVector,
+    Filter,
+    FieldCondition,
+    MatchValue,
 )
 
 from app.config import settings
@@ -143,5 +146,25 @@ class QdrantService:
                 points=points
             )
             logger.info(f"Upserted {len(points)} chunks into Qdrant.")
+
+    async def delete_by_chat_id(self, chat_id: str):
+        """Deletes all vector points associated with a specific chat_id."""
+        if not self.client:
+            return
+        try:
+            await self.client.delete(
+                collection_name=self.collection_name,
+                points_selector=Filter(
+                    must=[
+                        FieldCondition(
+                            key="chat_id",
+                            match=MatchValue(value=chat_id)
+                        )
+                    ]
+                )
+            )
+            logger.info(f"Deleted vector points for chat {chat_id} from Qdrant.")
+        except Exception as e:
+            logger.warning(f"Failed to delete Qdrant points for chat {chat_id}: {e}")
 
 qdrant_service = QdrantService()

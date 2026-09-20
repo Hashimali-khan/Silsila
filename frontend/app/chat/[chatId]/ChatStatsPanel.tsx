@@ -3,16 +3,17 @@
 import type { ChatStats } from "@/lib/types";
 import { formatNumber } from "@/lib/utils";
 import Link from "next/link";
-import { Sparkles, Search, MessageSquare, ArrowRight } from "lucide-react";
+import { Sparkles, Search, ArrowRight, Calendar, Users, MessageSquare, Flame } from "lucide-react";
+import { motion } from "framer-motion";
 
 const SENDER_COLORS = [
   "#ea580c", "#0284c7", "#16a34a", "#9333ea", "#e11d48", "#ca8a04", "#0d9488",
 ];
 
 const SUGGESTED_QUESTIONS = [
-  "When did we first meet or chat?",
-  "What were the biggest inside jokes?",
-  "Summarize key moments and plans",
+  { icon: "⏳", text: "When did we first meet or chat?" },
+  { icon: "🎭", text: "What were the biggest inside jokes?" },
+  { icon: "✈️", text: "Summarize key moments and plans" },
 ];
 
 export function ChatStatsPanel({ stats, chatId }: { stats: ChatStats; chatId: string }) {
@@ -20,194 +21,124 @@ export function ChatStatsPanel({ stats, chatId }: { stats: ChatStats; chatId: st
   const participantCount = stats.participants?.length || stats.sender_breakdown?.length || 0;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-      {/* AI Features Callout Card */}
-      <div
-        className="card"
-        style={{
-          padding: "1.25rem",
-          background: "linear-gradient(145deg, #fff7ed, #ffffff)",
-          border: "1px solid #fdba74",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
-          <span style={{ fontSize: "1.25rem" }}>✨</span>
-          <h3
-            style={{
-              fontFamily: "'Plus Jakarta Sans', sans-serif",
-              fontWeight: 800,
-              fontSize: "0.9375rem",
-              color: "#9a3412",
-              margin: 0,
-            }}
-          >
+    <div className="flex flex-col gap-4">
+      {/* AI Features Callout Card with Animated Glow */}
+      <div className="relative rounded-2xl bg-gradient-to-br from-orange-50 via-amber-50/50 to-white border-2 border-orange-300/80 p-5 shadow-lg shadow-orange-500/10 overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-orange-400/10 rounded-full blur-2xl pointer-events-none" />
+
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-6 h-6 rounded-lg bg-orange-600 text-white flex items-center justify-center shadow-xs">
+            <Sparkles size={14} className="animate-pulse" />
+          </div>
+          <h3 className="font-extrabold text-sm md:text-base text-orange-950 font-display m-0">
             Silsila AI Detective
           </h3>
         </div>
-        <p
-          style={{
-            fontSize: "0.8125rem",
-            color: "var(--text-secondary, #475569)",
-            margin: "0 0 0.875rem",
-            lineHeight: 1.4,
-          }}
-        >
-          Ask natural language questions about conversations, memories, promises, and arguments.
+
+        <p className="text-xs text-slate-600 mb-3.5 leading-relaxed">
+          Ask natural language questions about conversations, memories, promises, inside jokes, and dynamics.
         </p>
 
-        <Link
-          href={`/chat/${chatId}/qa`}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "0.5rem",
-            width: "100%",
-            padding: "0.625rem 1rem",
-            background: "linear-gradient(135deg, #ea580c, #f97316)",
-            color: "#ffffff",
-            fontWeight: 700,
-            fontSize: "0.875rem",
-            borderRadius: "0.5rem",
-            textDecoration: "none",
-            boxShadow: "0 2px 8px rgba(234, 88, 12, 0.25)",
-            marginBottom: "0.75rem",
-          }}
-        >
-          <Sparkles size={16} />
-          <span>Launch AI Detective</span>
-        </Link>
+        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+          <Link
+            href={`/chat/${chatId}/qa`}
+            className="flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-gradient-to-r from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-500 text-white font-bold text-xs md:text-sm rounded-xl shadow-md shadow-orange-600/25 transition-all mb-3.5 cursor-pointer"
+          >
+            <Sparkles size={15} />
+            <span>Launch AI Detective</span>
+          </Link>
+        </motion.div>
 
-        {/* Suggested Quick Questions */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
-          <span style={{ fontSize: "0.6875rem", fontWeight: 600, color: "#9a3412", textTransform: "uppercase" }}>
+        {/* Suggested Quick Questions with Physics Hover */}
+        <div className="space-y-1.5">
+          <span className="text-[10px] font-extrabold uppercase tracking-wider text-orange-900 block mb-1">
             Quick Prompts:
           </span>
           {SUGGESTED_QUESTIONS.map((q, idx) => (
-            <Link
+            <motion.div
               key={idx}
-              href={`/chat/${chatId}/qa?q=${encodeURIComponent(q)}`}
-              style={{
-                fontSize: "0.75rem",
-                color: "#c2410c",
-                background: "rgba(255, 237, 213, 0.6)",
-                padding: "0.375rem 0.5rem",
-                borderRadius: "0.375rem",
-                textDecoration: "none",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                transition: "background 0.15s",
-              }}
+              whileHover={{ x: 4, scale: 1.01 }}
+              whileTap={{ scale: 0.98 }}
+              transition={{ type: "spring", stiffness: 400, damping: 25 }}
             >
-              <span>{q}</span>
-              <ArrowRight size={12} />
-            </Link>
+              <Link
+                href={`/chat/${chatId}/qa?q=${encodeURIComponent(q.text)}`}
+                className="text-xs text-orange-900 bg-white/90 hover:bg-orange-100/80 border border-orange-200/90 py-2 px-2.5 rounded-xl flex items-center justify-between gap-2 shadow-2xs hover:shadow-xs transition-colors group cursor-pointer"
+              >
+                <div className="flex items-center gap-1.5 truncate">
+                  <span>{q.icon}</span>
+                  <span className="truncate font-medium">{q.text}</span>
+                </div>
+                <ArrowRight size={12} className="text-orange-500 shrink-0 transition-transform group-hover:translate-x-0.5" />
+              </Link>
+            </motion.div>
           ))}
         </div>
       </div>
 
       {/* Semantic Search Link Card */}
-      <div className="card" style={{ padding: "1rem 1.25rem" }}>
+      <motion.div whileHover={{ y: -2 }} transition={{ type: "spring", stiffness: 400, damping: 25 }}>
         <Link
           href={`/chat/${chatId}/search`}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            textDecoration: "none",
-            color: "var(--text-primary)",
-          }}
+          className="flex items-center justify-between p-4 rounded-2xl bg-white border border-slate-200 shadow-xs hover:border-orange-300 hover:shadow-md transition-all group"
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "0.625rem" }}>
-            <Search size={18} color="#ea580c" />
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
+              <Search size={18} />
+            </div>
             <div>
-              <div style={{ fontWeight: 700, fontSize: "0.875rem" }}>Semantic Search</div>
-              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+              <div className="font-bold text-xs md:text-sm text-slate-900">Semantic Search</div>
+              <div className="text-[11px] text-slate-500">
                 Search across all messages & topics
               </div>
             </div>
           </div>
-          <ArrowRight size={16} color="var(--text-muted)" />
+          <ArrowRight size={16} className="text-slate-400 group-hover:text-orange-600 group-hover:translate-x-1 transition-all" />
         </Link>
-      </div>
+      </motion.div>
 
-      {/* Overview card */}
-      <div className="card" style={{ padding: "1.25rem" }}>
-        <h3
-          style={{
-            fontFamily: "'Plus Jakarta Sans', sans-serif",
-            fontWeight: 700,
-            fontSize: "0.875rem",
-            color: "var(--text-secondary)",
-            textTransform: "uppercase",
-            letterSpacing: "0.05em",
-            margin: "0 0 0.875rem",
-          }}
-        >
-          Overview
+      {/* Overview stats card */}
+      <div className="p-4.5 rounded-2xl bg-white border border-slate-200 shadow-xs">
+        <h3 className="font-bold text-xs uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
+          <MessageSquare size={13} />
+          <span>Overview</span>
         </h3>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+        <div className="grid grid-cols-2 gap-2.5">
           <StatBox label="Messages" value={formatNumber(stats.total_messages)} />
           <StatBox label="Threads" value={formatNumber(stats.thread_count || 414)} />
           <StatBox label="Participants" value={String(participantCount)} />
+          <StatBox label="Archived" value="100%" />
         </div>
       </div>
 
-      {/* Per-sender breakdown */}
-      <div className="card" style={{ padding: "1.25rem" }}>
-        <h3
-          style={{
-            fontFamily: "'Plus Jakarta Sans', sans-serif",
-            fontWeight: 700,
-            fontSize: "0.875rem",
-            color: "var(--text-secondary)",
-            textTransform: "uppercase",
-            letterSpacing: "0.05em",
-            margin: "0 0 0.875rem",
-          }}
-        >
-          By Participant
+      {/* Per-sender breakdown card */}
+      <div className="p-4.5 rounded-2xl bg-white border border-slate-200 shadow-xs">
+        <h3 className="font-bold text-xs uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
+          <Users size={13} />
+          <span>By Participant</span>
         </h3>
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.625rem" }}>
+        <div className="space-y-3">
           {stats.sender_breakdown.map((s, i) => {
             const pct = Math.round((s.message_count / totalMsgs) * 100);
             const color = SENDER_COLORS[i % SENDER_COLORS.length];
             return (
-              <div key={s.sender_name}>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    marginBottom: "0.25rem",
-                    fontSize: "0.8125rem",
-                  }}
-                >
-                  <span
-                    style={{
-                      fontWeight: 500,
-                      color: "var(--text-primary)",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                      maxWidth: "65%",
-                    }}
-                  >
+              <div key={s.sender_name} className="group">
+                <div className="flex justify-between items-center mb-1 text-xs">
+                  <span className="font-semibold text-slate-700 truncate max-w-[65%] group-hover:text-orange-600 transition-colors">
                     {s.sender_name}
                   </span>
-                  <span style={{ color: "var(--text-muted)", flexShrink: 0 }}>
-                    {pct}%
-                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="text-slate-400 text-[11px]">{s.message_count.toLocaleString()}</span>
+                    <span className="font-bold text-slate-800 text-[11px]">{pct}%</span>
+                  </div>
                 </div>
-                <div className="progress-bar-track">
-                  <div
-                    style={{
-                      height: "100%",
-                      width: `${pct}%`,
-                      background: color,
-                      borderRadius: "var(--radius-full)",
-                      transition: "width 0.6s ease",
-                    }}
+                <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${pct}%` }}
+                    transition={{ duration: 0.8, ease: "easeOut" }}
+                    className="h-full rounded-full"
+                    style={{ background: color }}
                   />
                 </div>
               </div>
@@ -218,17 +149,12 @@ export function ChatStatsPanel({ stats, chatId }: { stats: ChatStats; chatId: st
 
       {/* Date range */}
       {stats.date_range?.start && (
-        <div className="card" style={{ padding: "1rem 1.25rem" }}>
-          <p
-            style={{
-              fontSize: "0.8125rem",
-              color: "var(--text-muted)",
-              margin: 0,
-            }}
-          >
-            📅 {new Date(stats.date_range.start).toLocaleDateString()} →{" "}
+        <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-500 flex items-center gap-2">
+          <Calendar size={14} className="text-orange-500 shrink-0" />
+          <span>
+            {new Date(stats.date_range.start).toLocaleDateString()} →{" "}
             {new Date(stats.date_range.end).toLocaleDateString()}
-          </p>
+          </span>
         </div>
       )}
     </div>
@@ -237,33 +163,11 @@ export function ChatStatsPanel({ stats, chatId }: { stats: ChatStats; chatId: st
 
 function StatBox({ label, value }: { label: string; value: string }) {
   return (
-    <div
-      style={{
-        background: "var(--stone-50)",
-        borderRadius: "var(--radius-md)",
-        padding: "0.625rem 0.75rem",
-      }}
-    >
-      <div
-        style={{
-          fontSize: "0.7rem",
-          color: "var(--text-muted)",
-          textTransform: "uppercase",
-          letterSpacing: "0.05em",
-          fontWeight: 500,
-          marginBottom: "0.25rem",
-        }}
-      >
+    <div className="bg-slate-50 border border-slate-100 rounded-xl p-3">
+      <div className="text-[10px] text-slate-400 uppercase tracking-wider font-bold mb-0.5">
         {label}
       </div>
-      <div
-        style={{
-          fontFamily: "'Plus Jakarta Sans', sans-serif",
-          fontWeight: 700,
-          fontSize: "1.1rem",
-          color: "var(--orange-600)",
-        }}
-      >
+      <div className="font-black text-base md:text-lg text-slate-900 font-display">
         {value}
       </div>
     </div>
