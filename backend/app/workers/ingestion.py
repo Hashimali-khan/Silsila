@@ -224,32 +224,41 @@ async def run_ingestion(
         stats = get_thread_stats(threads)
         logger.info("Job %s: %s", job_id, stats)
 
+        thread_records = []
+        junction_records = []
+
+        for thread_msgs in threads:
+            if not thread_msgs:
+                continue
+            thread_id = str(uuid.uuid4())
+            start_ts = thread_msgs[0]["timestamp"]
+            end_ts = thread_msgs[-1]["timestamp"]
+
+            thread_records.append((
+                thread_id, user_id, chat_id, start_ts, end_ts, len(thread_msgs)
+            ))
+
+            for msg in thread_msgs:
+                if msg.get("_db_id"):
+                    junction_records.append((msg["_db_id"], thread_id))
+
         async with pool.acquire() as conn:
             await set_rls_user(conn, user_id)
 
-            for thread_msgs in threads:
-                if not thread_msgs:
-                    continue
-                thread_id = str(uuid.uuid4())
-                start_ts = thread_msgs[0]["timestamp"]
-                end_ts = thread_msgs[-1]["timestamp"]
-
-                await conn.execute(
-                    """INSERT INTO public.conversation_threads
-                       (id, user_id, chat_id, start_time, end_time, message_count)
-                       VALUES ($1, $2, $3, $4, $5, $6)""",
-                    thread_id, user_id, chat_id, start_ts, end_ts, len(thread_msgs),
+            if thread_records:
+                await conn.copy_records_to_table(
+                    "conversation_threads",
+                    records=thread_records,
+                    columns=["id", "user_id", "chat_id", "start_time", "end_time", "message_count"],
+                    schema_name="public",
                 )
 
-                # Junction table: message ↔ thread
-                junctions = [
-                    (msg["_db_id"], thread_id)
-                    for msg in thread_msgs
-                    if msg.get("_db_id")
-                ]
-                await conn.executemany(
-                    "INSERT INTO public.message_threads (message_id, thread_id) VALUES ($1, $2)",
-                    junctions,
+            if junction_records:
+                await conn.copy_records_to_table(
+                    "message_threads",
+                    records=junction_records,
+                    columns=["message_id", "thread_id"],
+                    schema_name="public",
                 )
 
         # ── STEP 5: Update People Stats ───────────────────────────────────────

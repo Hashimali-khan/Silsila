@@ -5,6 +5,7 @@ from sse_starlette.sse import EventSourceResponse
 import json
 import logging
 import asyncio
+import re
 
 from app.dependencies import get_current_user_id
 from app.db.connection import get_pool, set_rls_user
@@ -17,10 +18,73 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+STOPWORDS = {
+    "what", "when", "where", "which", "who", "whom", "whose", "why", "how",
+    "is", "are", "was", "were", "been", "being", "have", "has", "had", "do",
+    "does", "did", "a", "an", "the", "and", "but", "if", "or", "because", "as",
+    "until", "while", "of", "at", "by", "for", "with", "about", "against", "between",
+    "into", "through", "during", "before", "after", "above", "below", "to", "from",
+    "up", "down", "in", "out", "on", "off", "over", "under", "again", "further",
+    "then", "once", "here", "there", "all", "any", "both", "each", "few", "more",
+    "most", "other", "some", "such", "no", "nor", "not", "only", "own", "same",
+    "so", "than", "too", "very", "can", "will", "just", "don", "should", "now",
+    "our", "we", "us", "me", "my", "you", "your", "they", "them", "it", "its"
+}
+
 class ChatQueryRequest(BaseModel):
     query_text: str
     chat_id: str
     person_id: Optional[str] = None
+
+async def fetch_conversation_windows(
+    conn,
+    chat_id: str,
+    anchor_records: list,
+    interval_minutes: int = 4,
+    max_total: int = 65
+) -> list:
+    """
+    Given matched anchor messages, retrieves the cohesive dialogue window
+    (preceding and following messages within ±interval_minutes) so the LLM sees
+    the entire conversational setup, banter, and reactions rather than isolated 1-liners.
+    """
+    if not anchor_records:
+        return []
+    
+    seen_ids = set()
+    all_msgs = []
+    
+    for r in anchor_records[:8]:
+        ts = r.get("timestamp")
+        if not ts:
+            continue
+        window_rows = await conn.fetch(
+            """
+            SELECT m.id, m.sender_name, m.timestamp, m.content, mt.thread_id
+            FROM public.messages m
+            LEFT JOIN public.message_threads mt ON m.id = mt.message_id
+            WHERE m.chat_id = $1::uuid
+              AND m.is_system_msg = false
+              AND m.content != ''
+              AND m.timestamp BETWEEN $2::timestamptz - ($3 || ' minutes')::interval 
+                                  AND $2::timestamptz + ($3 || ' minutes')::interval
+            ORDER BY m.timestamp ASC
+            LIMIT 15
+            """,
+            chat_id, ts, str(interval_minutes)
+        )
+        for w in window_rows:
+            wid = str(w["id"])
+            if wid not in seen_ids:
+                seen_ids.add(wid)
+                all_msgs.append(dict(w))
+            if len(all_msgs) >= max_total:
+                break
+        if len(all_msgs) >= max_total:
+            break
+
+    all_msgs.sort(key=lambda x: x["timestamp"])
+    return all_msgs
 
 @router.post("/chat")
 @limiter.limit("30/minute")
@@ -31,7 +95,7 @@ async def chat_endpoint(
     pool = Depends(get_pool)
 ):
     """
-    Streaming Q&A endpoint using SSE with hybrid search and fast Postgres fallback.
+    Streaming Q&A endpoint using SSE with hybrid search and windowed conversational RAG.
     """
     async def event_generator():
         yield {"data": json.dumps({"type": "status", "content": "Searching chat archive..."})}
@@ -47,7 +111,7 @@ async def chat_endpoint(
                 body.chat_id
             ))
 
-        # 2. If vector chunks exist, try Hybrid Search (capped at 3s)
+        # 2. If vector chunks exist, try Hybrid Search
         if has_chunks:
             try:
                 search_results = await asyncio.wait_for(
@@ -58,7 +122,7 @@ async def chat_endpoint(
                         person_id=body.person_id,
                         limit=10
                     ),
-                    timeout=3.0
+                    timeout=8.0
                 )
                 if search_results:
                     async with pool.acquire() as conn:
@@ -71,7 +135,7 @@ async def chat_endpoint(
             except Exception as e:
                 logger.warning(f"Vector search skipped/failed: {e}")
 
-        # 3. Direct Postgres Search (instant across all 18K+ messages)
+        # 3. Conversational RAG with Dialogue Windowing
         if not evidence_blocks:
             async with pool.acquire() as conn:
                 await set_rls_user(conn, user_id)
@@ -80,6 +144,20 @@ async def chat_endpoint(
                 is_first_chat = any(w in q_lower for w in [
                     "first", "start", "begin", "kab", "pehla", "pehli", "meet", "earliest", "origin", "shuru"
                 ])
+                is_sender_stats = any(w in q_lower for w in [
+                    "most message", "who send", "who text", "who sent", "more message", "active", "who talk"
+                ])
+                is_humor = any(w in q_lower for w in [
+                    "joke", "jokes", "inside joke", "funny", "laugh", "lmao", "lol", "humor", "banter",
+                    "teasing", "meme", "mazak", "roast", "funniest", "ajeeb", "bhai"
+                ])
+                is_trip = any(w in q_lower for w in [
+                    "plan", "plans", "trip", "trips", "travel", "vacation", "tour", "milte",
+                    "flight", "hotel", "ticket", "drive", "chalein", "chal", "party"
+                ])
+
+                kw_records = []
+                extra_context = ""
 
                 if is_first_chat:
                     # Retrieve the very first messages exchanged in this chat
@@ -90,31 +168,145 @@ async def chat_endpoint(
                         LEFT JOIN public.message_threads mt ON m.id = mt.message_id
                         WHERE m.chat_id = $1::uuid AND m.is_system_msg = false
                         ORDER BY m.timestamp ASC
-                        LIMIT 35
+                        LIMIT 40
                         """,
                         body.chat_id
                     )
-                else:
-                    # Keyword full-text search
+                elif is_sender_stats:
+                    # Provide exact sender counts + active sample dialogues
+                    stats_records = await conn.fetch(
+                        """
+                        SELECT sender_name, COUNT(*) AS msg_count
+                        FROM public.messages
+                        WHERE chat_id = $1::uuid AND is_system_msg = false
+                        GROUP BY sender_name
+                        ORDER BY msg_count DESC
+                        LIMIT 10
+                        """,
+                        body.chat_id
+                    )
+                    if stats_records:
+                        summary_lines = [f"- {r['sender_name']}: {r['msg_count']} messages" for r in stats_records]
+                        extra_context = "MESSAGE COUNT STATISTICS:\n" + "\n".join(summary_lines) + "\n\nSAMPLE RECENT DIALOGUES:\n"
+
                     kw_records = await conn.fetch(
                         """
                         SELECT m.id, m.sender_name, m.timestamp, m.content, mt.thread_id
                         FROM public.messages m
                         LEFT JOIN public.message_threads mt ON m.id = mt.message_id
+                        WHERE m.chat_id = $1::uuid AND m.is_system_msg = false
+                        ORDER BY m.timestamp DESC
+                        LIMIT 35
+                        """,
+                        body.chat_id
+                    )
+                elif is_humor:
+                    # Targeted retrieval of laughter, banter, and humorous exchanges
+                    anchor_humor = await conn.fetch(
+                        """
+                        SELECT m.id, m.sender_name, m.timestamp, m.content, mt.thread_id
+                        FROM public.messages m
+                        LEFT JOIN public.message_threads mt ON m.id = mt.message_id
                         WHERE m.chat_id = $1::uuid
+                          AND m.is_system_msg = false
                           AND m.content != ''
                           AND (
-                              m.content_tsv @@ plainto_tsquery('simple', $2)
-                              OR m.content ILIKE '%' || $2 || '%'
+                              m.content ILIKE '%haha%'
+                              OR m.content ILIKE '%😂%'
+                              OR m.content ILIKE '%🤣%'
+                              OR m.content ILIKE '%lmao%'
+                              OR m.content ILIKE '%lol%'
+                              OR m.content ILIKE '%rofl%'
+                              OR m.content ILIKE '%mazak%'
+                              OR m.content ILIKE '%joke%'
+                              OR m.content ILIKE '%ajeeb%'
+                              OR m.content ILIKE '%pagal%'
                           )
                         ORDER BY m.timestamp DESC
-                        LIMIT 25
+                        LIMIT 10
                         """,
-                        body.chat_id, body.query_text
+                        body.chat_id
                     )
+                    # Expand around banter moments so LLM sees the setup, jokes, and reactions
+                    kw_records = await fetch_conversation_windows(conn, body.chat_id, anchor_humor, interval_minutes=4, max_total=70)
+                elif is_trip:
+                    # Targeted retrieval of plans, trips, and meetups
+                    anchor_trips = await conn.fetch(
+                        """
+                        SELECT m.id, m.sender_name, m.timestamp, m.content, mt.thread_id
+                        FROM public.messages m
+                        LEFT JOIN public.message_threads mt ON m.id = mt.message_id
+                        WHERE m.chat_id = $1::uuid
+                          AND m.is_system_msg = false
+                          AND m.content != ''
+                          AND (
+                              m.content ILIKE '%plan%'
+                              OR m.content ILIKE '%trip%'
+                              OR m.content ILIKE '%chal%'
+                              OR m.content ILIKE '%ticket%'
+                              OR m.content ILIKE '%hotel%'
+                              OR m.content ILIKE '%tour%'
+                              OR m.content ILIKE '%meet%'
+                              OR m.content ILIKE '%milte%'
+                              OR m.content ILIKE '%dinner%'
+                          )
+                        ORDER BY m.timestamp DESC
+                        LIMIT 10
+                        """,
+                        body.chat_id
+                    )
+                    kw_records = await fetch_conversation_windows(conn, body.chat_id, anchor_trips, interval_minutes=5, max_total=70)
+                else:
+                    # Extract meaningful keywords for full-text search
+                    words = [
+                        w for w in re.findall(r'\b[a-zA-Z0-9_\u0600-\u06FF]{3,}\b', q_lower)
+                        if w not in STOPWORDS
+                    ]
 
-                    # Fallback to recent conversational context if no exact keyword hit
-                    if not kw_records:
+                    anchors = []
+                    if words:
+                        tsquery_str = " | ".join(words)
+                        try:
+                            anchors = await conn.fetch(
+                                """
+                                SELECT m.id, m.sender_name, m.timestamp, m.content, mt.thread_id,
+                                       ts_rank(m.search_vector, to_tsquery('simple', $2)) AS rank
+                                FROM public.messages m
+                                LEFT JOIN public.message_threads mt ON m.id = mt.message_id
+                                WHERE m.chat_id = $1::uuid
+                                  AND m.content != ''
+                                  AND m.search_vector IS NOT NULL
+                                  AND m.search_vector @@ to_tsquery('simple', $2)
+                                ORDER BY rank DESC, m.timestamp DESC
+                                LIMIT 10
+                                """,
+                                body.chat_id, tsquery_str
+                            )
+                        except Exception as e:
+                            logger.warning(f"to_tsquery failed with '{tsquery_str}': {e}")
+
+                    # Fallback to plain search / ILIKE if no hits
+                    if not anchors:
+                        anchors = await conn.fetch(
+                            """
+                            SELECT m.id, m.sender_name, m.timestamp, m.content, mt.thread_id
+                            FROM public.messages m
+                            LEFT JOIN public.message_threads mt ON m.id = mt.message_id
+                            WHERE m.chat_id = $1::uuid
+                              AND m.content != ''
+                              AND (
+                                  (m.search_vector IS NOT NULL AND m.search_vector @@ plainto_tsquery('simple', $2))
+                                  OR m.content ILIKE '%' || $2 || '%'
+                              )
+                            ORDER BY m.timestamp DESC
+                            LIMIT 10
+                            """,
+                            body.chat_id, body.query_text
+                        )
+
+                    if anchors:
+                        kw_records = await fetch_conversation_windows(conn, body.chat_id, anchors, interval_minutes=4, max_total=60)
+                    else:
                         kw_records = await conn.fetch(
                             """
                             SELECT m.id, m.sender_name, m.timestamp, m.content, mt.thread_id
@@ -122,16 +314,19 @@ async def chat_endpoint(
                             LEFT JOIN public.message_threads mt ON m.id = mt.message_id
                             WHERE m.chat_id = $1::uuid AND m.is_system_msg = false
                             ORDER BY m.timestamp DESC
-                            LIMIT 30
+                            LIMIT 40
                             """,
                             body.chat_id
                         )
 
-                if kw_records:
-                    content_text = "\n".join(
-                        f"[{r['timestamp'].strftime('%Y-%m-%d %H:%M') if r.get('timestamp') else ''}] [id: {str(r['id'])[:8]}] {r['sender_name']}: {r['content']}"
-                        for r in kw_records
-                    )
+                if kw_records or extra_context:
+                    dialogue_lines = []
+                    for r in kw_records:
+                        ts_str = r['timestamp'].strftime('%Y-%m-%d %H:%M') if r.get('timestamp') else ''
+                        mid = str(r['id'])[:8]
+                        dialogue_lines.append(f"[{ts_str}] [id: {mid}] {r['sender_name']}: {r['content']}")
+                    
+                    content_text = extra_context + "\n".join(dialogue_lines)
                     safe_messages = [
                         {
                             "id": str(r["id"]),
@@ -143,7 +338,7 @@ async def chat_endpoint(
                         for r in kw_records
                     ]
                     evidence_blocks = [{
-                        "thread_id": str(kw_records[0]["thread_id"]) if kw_records[0].get("thread_id") else "archive_timeline",
+                        "thread_id": str(kw_records[0]["thread_id"]) if kw_records and kw_records[0].get("thread_id") else "conversation_history",
                         "content": content_text,
                         "messages": safe_messages
                     }]
