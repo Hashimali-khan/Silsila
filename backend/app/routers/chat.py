@@ -132,10 +132,20 @@ async def chat_endpoint(
                         f"[{r['timestamp'].strftime('%Y-%m-%d %H:%M') if r.get('timestamp') else ''}] [id: {str(r['id'])[:8]}] {r['sender_name']}: {r['content']}"
                         for r in kw_records
                     )
+                    safe_messages = [
+                        {
+                            "id": str(r["id"]),
+                            "sender_name": r.get("sender_name") or "Unknown",
+                            "timestamp": r["timestamp"].isoformat() if r.get("timestamp") else None,
+                            "content": r.get("content") or "",
+                            "thread_id": str(r["thread_id"]) if r.get("thread_id") else None,
+                        }
+                        for r in kw_records
+                    ]
                     evidence_blocks = [{
                         "thread_id": str(kw_records[0]["thread_id"]) if kw_records[0].get("thread_id") else "archive_timeline",
                         "content": content_text,
-                        "messages": [dict(r) for r in kw_records]
+                        "messages": safe_messages
                     }]
 
         if not evidence_blocks:
@@ -145,12 +155,25 @@ async def chat_endpoint(
         yield {"data": json.dumps({"type": "status", "content": "Analyzing conversation memories..."})}
         
         # Send evidence blocks to client for citations UI
-        yield {"data": json.dumps({"type": "evidence", "content": evidence_blocks})}
+        yield {"data": json.dumps({"type": "evidence", "content": evidence_blocks}, default=str)}
         
         # 4. Stream LLM answer
-        async for token_msg in llm_service.stream_answer(body.query_text, evidence_blocks):
-            yield {"data": token_msg}
+        try:
+            async for token_msg in llm_service.stream_answer(body.query_text, evidence_blocks):
+                yield {"data": token_msg}
+        except Exception as e:
+            logger.exception(f"Error streaming LLM tokens: {e}")
+            yield {"data": json.dumps({"type": "error", "content": f"LLM generation failed: {str(e)}"})}
+            return
             
         yield {"data": json.dumps({"type": "done"})}
 
-    return EventSourceResponse(event_generator())
+    async def safe_event_generator():
+        try:
+            async for event in event_generator():
+                yield event
+        except Exception as e:
+            logger.exception(f"Fatal error in chat stream: {e}")
+            yield {"data": json.dumps({"type": "error", "content": f"Server error: {str(e)}"})}
+
+    return EventSourceResponse(safe_event_generator())

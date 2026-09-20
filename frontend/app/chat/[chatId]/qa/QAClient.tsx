@@ -118,6 +118,12 @@ export function QAClient({
           }
         }
       }
+
+      if (currentAnswer) {
+        setState({ status: "done", answer: currentAnswer, evidence: currentEvidence });
+      } else {
+        setState({ status: "error", message: "Response stream ended before an answer could be generated. Please try again." });
+      }
     } catch (e) {
       setState({ status: "error", message: e instanceof Error ? e.message : "QA failed" });
     }
