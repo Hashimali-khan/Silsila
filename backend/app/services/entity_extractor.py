@@ -45,9 +45,10 @@ class EntityExtractor:
     def __init__(self):
         # We delay model loading until the first call to save memory during import
         self.is_loaded = False
+        self.fallback_to_llm = False
 
     def load_model(self):
-        if self.is_loaded or settings.USE_LLM_EXTRACTOR:
+        if self.is_loaded or self.fallback_to_llm or settings.USE_LLM_EXTRACTOR:
             return
         
         logger.info(f"Loading GLiNER model: {MODEL_NAME} (quantized, low CPU mem)")
@@ -62,8 +63,8 @@ class EntityExtractor:
             self.is_loaded = True
             logger.info("GLiNER model loaded successfully.")
         except Exception as e:
-            logger.error(f"Failed to load GLiNER model: {e}")
-            raise
+            logger.warning("Failed to load local GLiNER model (%s); falling back to LLM entity extraction.", e)
+            self.fallback_to_llm = True
 
     def heuristic_scan(self, text: str) -> bool:
         """
@@ -89,7 +90,10 @@ class EntityExtractor:
         if not text or not self.heuristic_scan(text):
             return []
 
-        if settings.USE_LLM_EXTRACTOR:
+        if not self.is_loaded and not self.fallback_to_llm and not settings.USE_LLM_EXTRACTOR:
+            self.load_model()
+
+        if settings.USE_LLM_EXTRACTOR or self.fallback_to_llm:
             prompt = f"Extract all named entities of types (Person, Location, Event, Topic) from the following text:\n\n{text}"
             try:
                 result = await llm_service.generate_json(prompt, response_schema=EntityExtractionResult)
@@ -98,13 +102,11 @@ class EntityExtractor:
                 logger.error(f"LLM Entity Extraction Error: {e}")
                 return []
         else:
-            if not self.is_loaded:
-                self.load_model()
-                
             try:
-                # GLiNER predict_entities returns a list of dictionaries
-                entities = self._model.predict_entities(text, TARGET_LABELS, flat_ner=True, threshold=0.5)
-                return entities
+                if self._model:
+                    entities = self._model.predict_entities(text, TARGET_LABELS, flat_ner=True, threshold=0.5)
+                    return entities
+                return []
             except Exception as e:
                 logger.error(f"Error extracting entities for text: {e}")
                 return []
@@ -113,7 +115,10 @@ class EntityExtractor:
         """
         Extracts entities from a batch of texts.
         """
-        if settings.USE_LLM_EXTRACTOR:
+        if not self.is_loaded and not self.fallback_to_llm and not settings.USE_LLM_EXTRACTOR:
+            self.load_model()
+
+        if settings.USE_LLM_EXTRACTOR or self.fallback_to_llm:
             # Run in parallel using asyncio.gather for LLM API calls to speed it up
             tasks = [self.extract_entities(text) for text in texts]
             return await asyncio.gather(*tasks)

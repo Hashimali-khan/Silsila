@@ -31,6 +31,7 @@ from app.services.embedding import VoyageAIClient, record_token_usage
 from app.services.qdrant_client import qdrant_service
 from app.services.entity_extractor import entity_extractor
 from app.services.coreference import process_extracted_entities
+from app.services.chunk_enricher import enrich_chunks_with_entities
 from app.services.graph_builder import build_person_profile
 from app.workers.analytics import process_chat_sentiment_background
 
@@ -48,22 +49,27 @@ async def _update_job(
     """Update ingestion_jobs row. Called after each pipeline step."""
     set_clauses = ", ".join(f"{k} = ${i+2}" for i, k in enumerate(fields))
     values = list(fields.values())
-    await pool.execute(
-        f"UPDATE public.ingestion_jobs SET {set_clauses} WHERE id = $1",
-        job_id,
-        *values,
-    )
+    async with pool.acquire() as conn:
+        await set_rls_user(conn, user_id)
+        await conn.execute(
+            f"UPDATE public.ingestion_jobs SET {set_clauses} WHERE id = $1",
+            job_id,
+            *values,
+        )
 
 
-async def _fail_job(pool: asyncpg.Pool, job_id: str, error: str) -> None:
-    await pool.execute(
-        """UPDATE public.ingestion_jobs
-           SET status = 'failed', error_message = $2,
-               current_step = 'failed', completed_at = NOW()
-           WHERE id = $1""",
-        job_id,
-        error[:2000],  # truncate to fit column
-    )
+async def _fail_job(pool: asyncpg.Pool, job_id: str, error: str, user_id: str | None = None) -> None:
+    async with pool.acquire() as conn:
+        if user_id:
+            await set_rls_user(conn, user_id)
+        await conn.execute(
+            """UPDATE public.ingestion_jobs
+               SET status = 'failed', error_message = $2,
+                   current_step = 'failed', completed_at = NOW()
+               WHERE id = $1""",
+            job_id,
+            error[:2000],  # truncate to fit column
+        )
 
 
 # ── Main pipeline ─────────────────────────────────────────────────────────────
@@ -95,7 +101,7 @@ async def run_ingestion(
 
         messages = parse_whatsapp_export(file_content)
         if not messages:
-            await _fail_job(pool, job_id, "No messages found. Is this a valid WhatsApp export?")
+            await _fail_job(pool, job_id, "No messages found. Is this a valid WhatsApp export?", user_id=user_id)
             return
 
         non_system = [m for m in messages if not m["is_system_msg"]]
@@ -201,15 +207,13 @@ async def run_ingestion(
                     # Store msg_id back for thread step
                     msg["_db_id"] = msg_id
 
-                await conn.copy_records_to_table(
-                    "messages",
-                    records=records,
-                    columns=[
-                        "id", "user_id", "chat_id", "person_id",
-                        "sender_name", "timestamp", "content",
-                        "is_system_msg", "is_media", "metadata",
-                    ],
-                    schema_name="public",
+                await conn.executemany(
+                    """
+                    INSERT INTO public.messages
+                        (id, user_id, chat_id, person_id, sender_name, timestamp, content, is_system_msg, is_media, metadata)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb)
+                    """,
+                    records,
                 )
                 total_inserted += len(batch)
                 await _update_job(pool, job_id, user_id,
@@ -246,19 +250,24 @@ async def run_ingestion(
             await set_rls_user(conn, user_id)
 
             if thread_records:
-                await conn.copy_records_to_table(
-                    "conversation_threads",
-                    records=thread_records,
-                    columns=["id", "user_id", "chat_id", "start_time", "end_time", "message_count"],
-                    schema_name="public",
+                await conn.executemany(
+                    """
+                    INSERT INTO public.conversation_threads
+                        (id, user_id, chat_id, start_time, end_time, message_count)
+                    VALUES ($1, $2, $3, $4, $5, $6)
+                    """,
+                    thread_records,
                 )
 
             if junction_records:
-                await conn.copy_records_to_table(
-                    "message_threads",
-                    records=junction_records,
-                    columns=["message_id", "thread_id"],
-                    schema_name="public",
+                await conn.executemany(
+                    """
+                    INSERT INTO public.message_threads
+                        (message_id, thread_id)
+                    VALUES ($1, $2)
+                    ON CONFLICT DO NOTHING
+                    """,
+                    junction_records,
                 )
 
         # ── STEP 5: Update People Stats ───────────────────────────────────────
@@ -416,7 +425,17 @@ async def run_ingestion(
                 
             logger.info("Job %s: extracted entities from %d flagged messages", job_id, extracted_messages)
 
-        # ── STEP 5.4: Build People Profiles ───────────────────────────────────
+        # ── STEP 5.5: Chunk Entity Enrichment ─────────────────────────────────
+        # Backfill entity_ids onto message_chunks rows and Qdrant payloads.
+        # Must run AFTER entity extraction so entity_mentions rows exist.
+        await _update_job(pool, job_id, user_id, current_step="chunk_enrichment")
+        if chunks:
+            async with pool.acquire() as conn:
+                await set_rls_user(conn, user_id)
+                await enrich_chunks_with_entities(conn, user_id, chat_id, chunks)
+            logger.info("Job %s: chunk entity enrichment complete", job_id)
+
+        # ── STEP 5.6: Build People Profiles ───────────────────────────────────
         await _update_job(pool, job_id, user_id, current_step="people_profiles")
         
         # We don't need a connection here as build_person_profile manages its own
@@ -444,4 +463,4 @@ async def run_ingestion(
 
     except Exception as exc:
         logger.exception("Job %s failed: %s", job_id, exc)
-        await _fail_job(pool, job_id, str(exc))
+        await _fail_job(pool, job_id, str(exc), user_id=user_id)

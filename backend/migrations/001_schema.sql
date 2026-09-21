@@ -128,6 +128,7 @@ CREATE TABLE IF NOT EXISTS public.message_chunks (
     message_ids      UUID[] NOT NULL,
     message_count    INTEGER NOT NULL,
     voyage_tokens    INTEGER DEFAULT 0,  -- tokens used for this chunk embedding
+    entity_ids       UUID[] DEFAULT '{}', -- people mentioned in this chunk (backfilled after entity extraction)
     created_at       TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -177,6 +178,21 @@ CREATE TABLE IF NOT EXISTS public.alias_suggestions (
     context_snippet     TEXT,
     resolved_at         TIMESTAMPTZ,
     created_at          TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ENTITY MENTIONS (Phase 3)
+-- Junction: message ↔ entity. Records every pronoun/name/alias resolved to a person.
+-- Original messages.content is NEVER modified; annotations live here.
+CREATE TABLE IF NOT EXISTS public.entity_mentions (
+    id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id           TEXT NOT NULL,
+    message_id        UUID NOT NULL REFERENCES public.messages(id) ON DELETE CASCADE,
+    person_id         UUID NOT NULL REFERENCES public.people(id) ON DELETE CASCADE,
+    mention_text      TEXT NOT NULL,       -- original surface form: "he", "bhai", "Abdullah"
+    resolution_method TEXT NOT NULL,       -- 'exact_alias' | 'llm_coref' | 'hitl_confirmed'
+    confidence        FLOAT DEFAULT 1.0,
+    created_at        TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(message_id, person_id, mention_text)
 );
 
 -- RELATIONSHIPS (graph edges — Phase 3)
@@ -258,11 +274,17 @@ CREATE INDEX IF NOT EXISTS idx_events_chat         ON public.events(chat_id);
 CREATE INDEX IF NOT EXISTS idx_emotions_message    ON public.emotion_labels(message_id);
 CREATE INDEX IF NOT EXISTS idx_cache_chat          ON public.analysis_cache(chat_id);
 
--- Trigram index for fuzzy alias matching (Phase 3 coreference)
 CREATE INDEX IF NOT EXISTS idx_aliases_trgm
     ON public.aliases USING GIN(alias gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS idx_people_name_trgm
     ON public.people USING GIN(canonical_name gin_trgm_ops);
+
+-- Entity mention indexes (Phase 3 coreference)
+CREATE INDEX IF NOT EXISTS idx_entity_mentions_person  ON public.entity_mentions(person_id);
+CREATE INDEX IF NOT EXISTS idx_entity_mentions_message ON public.entity_mentions(message_id);
+CREATE INDEX IF NOT EXISTS idx_entity_mentions_user    ON public.entity_mentions(user_id);
+-- GIN index for array-containment queries: WHERE $person_id = ANY(entity_ids)
+CREATE INDEX IF NOT EXISTS idx_chunks_entity_ids       ON public.message_chunks USING GIN(entity_ids);
 
 -- =============================================================
 -- NATIVE ROW LEVEL SECURITY (ADR §12)
@@ -286,6 +308,7 @@ ALTER TABLE public.relationships      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.events             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.emotion_labels     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.analysis_cache     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.entity_mentions    ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE public.profiles           FORCE ROW LEVEL SECURITY;
 ALTER TABLE public.chats              FORCE ROW LEVEL SECURITY;
@@ -302,6 +325,7 @@ ALTER TABLE public.relationships      FORCE ROW LEVEL SECURITY;
 ALTER TABLE public.events             FORCE ROW LEVEL SECURITY;
 ALTER TABLE public.emotion_labels     FORCE ROW LEVEL SECURITY;
 ALTER TABLE public.analysis_cache     FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.entity_mentions    FORCE ROW LEVEL SECURITY;
 
 -- Allow superuser / migration user to bypass RLS
 CREATE POLICY "own_data" ON public.profiles
@@ -344,6 +368,10 @@ CREATE POLICY "own_data" ON public.emotion_labels
     FOR ALL USING (user_id = current_setting('app.user_id', true));
 
 CREATE POLICY "own_data" ON public.analysis_cache
+    FOR ALL USING (user_id = current_setting('app.user_id', true));
+
+-- entity_mentions needs a join check (user_id is stored directly for RLS speed)
+CREATE POLICY "own_data" ON public.entity_mentions
     FOR ALL USING (user_id = current_setting('app.user_id', true));
 
 -- message_threads needs a join (not on hot path)

@@ -9,7 +9,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFi
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
-from app.db.connection import get_pool
+from app.db.connection import get_pool, set_rls_user
 from app.dependencies import get_current_user_id
 from app.workers.ingestion import run_ingestion
 from app.limiter import limiter
@@ -91,15 +91,17 @@ async def upload_whatsapp(
     pool = await get_pool()
     job_id = str(uuid.uuid4())
 
-    await pool.execute(
-        """INSERT INTO public.ingestion_jobs
-           (id, user_id, status, file_name, current_step, created_at)
-           VALUES ($1, $2, 'pending', $3, 'queued', $4)""",
-        job_id,
-        user_id,
-        file.filename,
-        datetime.now(timezone.utc),
-    )
+    async with pool.acquire() as conn:
+        await set_rls_user(conn, user_id)
+        await conn.execute(
+            """INSERT INTO public.ingestion_jobs
+               (id, user_id, status, file_name, current_step, created_at)
+               VALUES ($1, $2, 'pending', $3, 'queued', $4)""",
+            job_id,
+            user_id,
+            file.filename,
+            datetime.now(timezone.utc),
+        )
 
     # ── Kick off background pipeline ──────────────────────────────────────────
     background_tasks.add_task(
@@ -129,15 +131,17 @@ async def get_job_status(
         raise HTTPException(status_code=400, detail="Invalid job ID format.")
 
     pool = await get_pool()
-    row = await pool.fetchrow(
-        """SELECT id::text AS job_id, status, current_step, total_messages,
-                  processed_messages, error_message,
-                  chat_id::text
-           FROM public.ingestion_jobs
-           WHERE id = $1::uuid AND user_id = $2""",
-        job_id,
-        user_id,
-    )
+    async with pool.acquire() as conn:
+        await set_rls_user(conn, user_id)
+        row = await conn.fetchrow(
+            """SELECT id::text AS job_id, status, current_step, total_messages,
+                      processed_messages, error_message,
+                      chat_id::text
+               FROM public.ingestion_jobs
+               WHERE id = $1::uuid AND user_id = $2""",
+            job_id,
+            user_id,
+        )
     if not row:
         raise HTTPException(status_code=404, detail="Job not found.")
     return JobStatusResponse(**dict(row))
@@ -165,11 +169,13 @@ async def stream_job_progress(
     pool = await get_pool()
 
     # Verify job ownership before streaming
-    row = await pool.fetchrow(
-        "SELECT id FROM public.ingestion_jobs WHERE id = $1::uuid AND user_id = $2",
-        job_id,
-        user_id,
-    )
+    async with pool.acquire() as conn:
+        await set_rls_user(conn, user_id)
+        row = await conn.fetchrow(
+            "SELECT id FROM public.ingestion_jobs WHERE id = $1::uuid AND user_id = $2",
+            job_id,
+            user_id,
+        )
     if not row:
         raise HTTPException(status_code=404, detail="Job not found.")
 
@@ -179,13 +185,15 @@ async def stream_job_progress(
         max_polls = 600       # timeout after 10 minutes
 
         for _ in range(max_polls):
-            record = await pool.fetchrow(
-                """SELECT status, current_step, total_messages,
-                          processed_messages, error_message, chat_id::text
-                   FROM public.ingestion_jobs
-                   WHERE id = $1::uuid""",
-                job_id,
-            )
+            async with pool.acquire() as conn:
+                await set_rls_user(conn, user_id)
+                record = await conn.fetchrow(
+                    """SELECT status, current_step, total_messages,
+                              processed_messages, error_message, chat_id::text
+                       FROM public.ingestion_jobs
+                       WHERE id = $1::uuid""",
+                    job_id,
+                )
             if not record:
                 yield {"event": "error", "data": '{"error": "Job not found"}'}
                 return

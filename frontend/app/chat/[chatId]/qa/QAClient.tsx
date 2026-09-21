@@ -324,42 +324,57 @@ export function QAClient({
       let currentAnswer = "";
       let currentEvidence: any[] = [];
       let isAnswering = false;
+      let buffer = "";
+
+      const processLine = (rawLine: string): boolean => {
+        const line = rawLine.replace(/\r$/, "").trim();
+        if (!line || !line.startsWith("data:")) return true;
+
+        const dataStr = line.replace(/^data:\s*/, "").trim();
+        if (!dataStr) return true;
+
+        try {
+          const data = JSON.parse(dataStr);
+          if (data.type === "status") {
+            if (!isAnswering) {
+              setState({ status: "searching", message: data.content });
+            }
+          } else if (data.type === "evidence") {
+            currentEvidence = data.content;
+          } else if (data.type === "token") {
+            isAnswering = true;
+            currentAnswer += data.content;
+            setState({ status: "answering", answer: currentAnswer, evidence: currentEvidence });
+          } else if (data.type === "error") {
+            setState({ status: "error", message: data.content });
+            return false;
+          } else if (data.type === "done") {
+            setState({ status: "done", answer: currentAnswer, evidence: currentEvidence });
+            return false;
+          }
+        } catch (e) {
+          console.error("Failed to parse SSE message:", dataStr, e);
+        }
+        return true;
+      };
 
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split("\n");
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            const dataStr = line.substring(6).trim();
-            if (!dataStr) continue;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        // Keep the last segment in buffer as it may be an incomplete chunk
+        buffer = lines.pop() ?? "";
 
-            try {
-              const data = JSON.parse(dataStr);
-              if (data.type === "status") {
-                if (!isAnswering) {
-                  setState({ status: "searching", message: data.content });
-                }
-              } else if (data.type === "evidence") {
-                currentEvidence = data.content;
-              } else if (data.type === "token") {
-                isAnswering = true;
-                currentAnswer += data.content;
-                setState({ status: "answering", answer: currentAnswer, evidence: currentEvidence });
-              } else if (data.type === "error") {
-                setState({ status: "error", message: data.content });
-                return;
-              } else if (data.type === "done") {
-                setState({ status: "done", answer: currentAnswer, evidence: currentEvidence });
-                return;
-              }
-            } catch (e) {
-              console.error("Failed to parse SSE message:", dataStr, e);
-            }
-          }
+        for (const line of lines) {
+          if (!processLine(line)) return;
         }
+      }
+
+      // Process any trailing line in buffer
+      if (buffer.trim()) {
+        processLine(buffer);
       }
 
       if (currentAnswer) {

@@ -16,7 +16,7 @@ from app.limiter import limiter
 
 from app.config import settings
 from app.db.connection import get_pool, close_pool
-from app.routers import parse, search, chat, analytics, investigate, alias_suggestions, insights, account
+from app.routers import parse, search, chat, analytics, investigate, alias_suggestions, insights, account, entity_timeline
 
 logger = logging.getLogger(__name__)
 
@@ -62,9 +62,17 @@ from fastapi.responses import JSONResponse
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception) -> Response:
     logger.error("Unhandled exception for %s %s: %s", request.method, request.url.path, exc, exc_info=True)
+    origin = request.headers.get("origin", "")
+    headers = {}
+    if origin in settings.allowed_origins_list or not settings.is_production:
+        headers["Access-Control-Allow-Origin"] = origin or "*"
+        headers["Access-Control-Allow-Credentials"] = "true"
+        headers["Access-Control-Allow-Methods"] = "*"
+        headers["Access-Control-Allow-Headers"] = "*"
     return JSONResponse(
         status_code=500,
         content={"detail": str(exc) if not settings.is_production else "Internal Server Error"},
+        headers=headers,
     )
 
 # ── Middleware ────────────────────────────────────────────────────────────────
@@ -109,6 +117,7 @@ app.include_router(investigate.router, prefix="/api", tags=["investigate"])
 app.include_router(alias_suggestions.router, prefix="/api", tags=["aliases"])
 app.include_router(insights.router, prefix="/api", tags=["insights"])
 app.include_router(account.router, prefix="/api", tags=["account"])
+app.include_router(entity_timeline.router, prefix="/api", tags=["entities"])
 
 
 @app.get("/api/health", tags=["ops"])

@@ -40,8 +40,12 @@ async def hybrid_search(
         logger.error(f"Failed to embed query: {e}")
         return []
 
-    # 2. Generate sparse embedding for the query
-    sparse_query: SparseVector = qdrant_service._generate_bm25_sparse_vector(query_text)
+    # 2. Generate sparse embedding for the query using fastembed BM25
+    sparse_emb = list(qdrant_service.sparse_model.embed([query_text]))[0]
+    sparse_query = SparseVector(
+        indices=sparse_emb.indices.tolist() if hasattr(sparse_emb.indices, 'tolist') else list(sparse_emb.indices),
+        values=sparse_emb.values.tolist() if hasattr(sparse_emb.values, 'tolist') else list(sparse_emb.values)
+    )
 
     # 3. Build filters (user_id and chat_id are mandatory)
     must_conditions = [

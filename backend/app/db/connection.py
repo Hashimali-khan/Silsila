@@ -48,8 +48,9 @@ async def set_rls_user(conn: asyncpg.Connection, user_id: str) -> None:
 
     All RLS policies filter on current_setting('app.user_id', true).
     This must be called on every connection before any query that touches
-    user-scoped tables.
+    user-scoped tables. Using is_local=false ensures the setting persists
+    across queries executed on this connection outside explicit transactions.
     """
     await conn.execute(
-        "SELECT set_config('app.user_id', $1, true)", user_id
+        "SELECT set_config('app.user_id', $1, false)", user_id
     )

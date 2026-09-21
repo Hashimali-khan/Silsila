@@ -324,7 +324,13 @@ async def chat_endpoint(
                     for r in kw_records:
                         ts_str = r['timestamp'].strftime('%Y-%m-%d %H:%M') if r.get('timestamp') else ''
                         mid = str(r['id'])[:8]
-                        dialogue_lines.append(f"[{ts_str}] [id: {mid}] {r['sender_name']}: {r['content']}")
+                        raw_msg = r.get('content') or ''
+                        # Cap excessively long single messages so they don't blow up token windows or network buffers
+                        if len(raw_msg) > 1500:
+                            msg_display = raw_msg[:1500] + "... [truncated]"
+                        else:
+                            msg_display = raw_msg
+                        dialogue_lines.append(f"[{ts_str}] [id: {mid}] {r['sender_name']}: {msg_display}")
                     
                     content_text = extra_context + "\n".join(dialogue_lines)
                     safe_messages = [
@@ -332,7 +338,7 @@ async def chat_endpoint(
                             "id": str(r["id"]),
                             "sender_name": r.get("sender_name") or "Unknown",
                             "timestamp": r["timestamp"].isoformat() if r.get("timestamp") else None,
-                            "content": r.get("content") or "",
+                            "content": (r.get("content")[:1500] + "... [truncated]") if len(r.get("content") or "") > 1500 else (r.get("content") or ""),
                             "thread_id": str(r["thread_id"]) if r.get("thread_id") else None,
                         }
                         for r in kw_records
@@ -349,8 +355,15 @@ async def chat_endpoint(
 
         yield {"data": json.dumps({"type": "status", "content": "Analyzing conversation memories..."})}
         
-        # Send evidence blocks to client for citations UI
-        yield {"data": json.dumps({"type": "evidence", "content": evidence_blocks}, default=str)}
+        # Send lightweight evidence blocks to client for citations UI (only thread_id & messages needed)
+        client_evidence = [
+            {
+                "thread_id": b.get("thread_id"),
+                "messages": b.get("messages", [])
+            }
+            for b in evidence_blocks
+        ]
+        yield {"data": json.dumps({"type": "evidence", "content": client_evidence}, default=str)}
         
         # 4. Stream LLM answer
         try:

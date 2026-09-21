@@ -99,15 +99,13 @@ async def process_chat_chunks(conn: asyncpg.Connection, user_id: str, chat_id: s
             c["message_count"]
         ))
         
-    await conn.copy_records_to_table(
-        "message_chunks",
-        records=records,
-        columns=[
-            "id", "user_id", "chat_id", "thread_id", "qdrant_id",
-            "start_message_id", "end_message_id", "start_time", "end_time",
-            "content", "message_ids", "message_count"
-        ],
-        schema_name="public",
+    await conn.executemany(
+        """
+        INSERT INTO public.message_chunks
+            (id, user_id, chat_id, thread_id, qdrant_id, start_message_id, end_message_id, start_time, end_time, content, message_ids, message_count)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        """,
+        records,
     )
     
     return all_chunks
