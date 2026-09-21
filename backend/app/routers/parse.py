@@ -68,6 +68,22 @@ async def upload_whatsapp(
     if len(content_bytes) > MAX_FILE_SIZE_BYTES:
         raise HTTPException(status_code=413, detail="File exceeds the 50 MB limit.")
 
+    if ext == "zip":
+        import zipfile
+        import io
+        try:
+            with zipfile.ZipFile(io.BytesIO(content_bytes)) as z:
+                # Find the first .txt file in the zip
+                txt_files = [f for f in z.namelist() if f.lower().endswith(".txt")]
+                if not txt_files:
+                    raise HTTPException(status_code=422, detail="No .txt file found inside the ZIP archive.")
+                # Read the first .txt file (WhatsApp usually names it _chat.txt)
+                content_bytes = z.read(txt_files[0])
+                if len(content_bytes) > MAX_FILE_SIZE_BYTES:
+                    raise HTTPException(status_code=413, detail="Extracted file exceeds the 50 MB limit.")
+        except zipfile.BadZipFile:
+            raise HTTPException(status_code=422, detail="Invalid ZIP file.")
+
     # Validate UTF-8 (reject binary files disguised as .txt)
     try:
         content = content_bytes.decode("utf-8")

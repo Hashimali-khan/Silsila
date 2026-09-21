@@ -93,7 +93,13 @@ async def delete_chat(
     user_id: str = Depends(get_current_user_id),
 ):
     """
-    Permanently deletes a specific chat and cascades to all its messages, threads, and chunks.
+    Permanently deletes a specific chat and all its dependent data.
+
+    Explicitly deletes from every child table in leaf-to-root order rather than
+    relying on ON DELETE CASCADE, because FORCE ROW LEVEL SECURITY applies RLS
+    policies to cascade operations.  The join-based RLS policy on message_threads
+    (``message_id IN (SELECT id FROM messages …)``) fails during cascade when
+    the referenced messages are being deleted in the same operation.
     """
     try:
         uuid.UUID(chat_id)
@@ -111,10 +117,66 @@ async def delete_chat(
             raise HTTPException(status_code=404, detail="Chat not found.")
 
         async with conn.transaction():
-            await conn.execute("DELETE FROM public.ingestion_jobs WHERE chat_id = $1::uuid", chat_id)
-            await conn.execute("DELETE FROM public.chats WHERE id = $1::uuid AND user_id = $2", chat_id, user_id)
+            # 1. Leaf tables that reference messages (via message_id FK)
+            # Using USING clause for efficiency over 100k+ rows instead of IN (subquery)
+            await conn.execute(
+                """
+                DELETE FROM public.entity_mentions em
+                USING public.messages m 
+                WHERE em.message_id = m.id AND m.chat_id = $1::uuid
+                """,
+                chat_id, timeout=300,
+            )
+            await conn.execute(
+                """
+                DELETE FROM public.emotion_labels el
+                USING public.messages m 
+                WHERE el.message_id = m.id AND m.chat_id = $1::uuid
+                """,
+                chat_id, timeout=300,
+            )
+            await conn.execute(
+                """
+                DELETE FROM public.message_threads mt
+                USING public.messages m 
+                WHERE mt.message_id = m.id AND m.chat_id = $1::uuid
+                """,
+                chat_id, timeout=300,
+            )
 
-    # Clean up Qdrant vectors for this chat asynchronously
+            # 2. Tables that reference chats directly
+            await conn.execute(
+                "DELETE FROM public.analysis_cache WHERE chat_id = $1::uuid",
+                chat_id, timeout=300,
+            )
+            await conn.execute(
+                "DELETE FROM public.events WHERE chat_id = $1::uuid",
+                chat_id, timeout=300,
+            )
+            await conn.execute(
+                "DELETE FROM public.message_chunks WHERE chat_id = $1::uuid",
+                chat_id, timeout=300,
+            )
+            await conn.execute(
+                "DELETE FROM public.conversation_threads WHERE chat_id = $1::uuid",
+                chat_id, timeout=300,
+            )
+            await conn.execute(
+                "DELETE FROM public.messages WHERE chat_id = $1::uuid",
+                chat_id, timeout=300,
+            )
+            await conn.execute(
+                "DELETE FROM public.ingestion_jobs WHERE chat_id = $1::uuid",
+                chat_id, timeout=300,
+            )
+
+            # 3. Finally, the chat itself
+            await conn.execute(
+                "DELETE FROM public.chats WHERE id = $1::uuid AND user_id = $2",
+                chat_id, user_id, timeout=300,
+            )
+
+    # Clean up Qdrant vectors for this chat
     try:
         await qdrant_service.delete_by_chat_id(chat_id)
     except Exception as e:

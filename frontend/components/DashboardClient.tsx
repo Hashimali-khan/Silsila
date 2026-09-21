@@ -125,7 +125,7 @@ export function DashboardClient({ initialChats }: DashboardClientProps) {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
 
-      if (!res.ok && res.status !== 204) {
+      if (!res.ok) {
         const data = await res.json().catch(() => ({ detail: "Failed to delete chat" }));
         throw new Error(data.detail || "Failed to delete chat");
       }

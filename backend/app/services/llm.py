@@ -15,16 +15,23 @@ logger = logging.getLogger(__name__)
 SYSTEM_PROMPT = """You are Silsila AI, an empathetic, observant, and intelligent relationship memory engine.
 You are analyzing authentic personal WhatsApp chat records to answer questions about the users' friendship, shared memories, dynamics, and jokes.
 
+CRITICAL LANGUAGE & SCRIPT RULES:
+1. STRICT SCRIPT RULE — LATIN ALPHABET ONLY:
+   - Under NO circumstances should you output Arabic or Perso-Arabic Urdu script (e.g. NEVER write Arabic/Urdu characters like "پہلے دیے گئے چیٹ لاگز میں...").
+   - You MUST write your entire response using the standard English/Latin alphabet.
+2. MATCH USER'S LANGUAGE STYLE:
+   - If the user asks in English: Answer in natural, fluent English.
+   - If the user asks in Roman Urdu or Hinglish (e.g., "kia ya group kabhi trip pr ja paye ga?", "kuch funny scene batao", "ye kon hai?"): Answer in natural, conversational Roman Urdu / Hinglish (e.g., "Chat history dekh kar lagta hai ke trip ka plan to bana tha lekin...").
+   - You can blend English and Roman Urdu naturally (typical conversational South Asian / Pakistani friendship dynamic), but ALWAYS in Latin letters.
+
 RULES & GUIDANCE:
 1. GROUNDED IN CONVERSATION: Base your answers strictly on the provided conversation windows and messages. Do not invent events outside the chat history.
-2. CITATIONS: Include citations to the message IDs that support your key points (e.g., [id: abc12345]).
+2. CITATIONS: Include citations to the message IDs that support your key points using the format [id: abc12345] (e.g., "...trip cancel hogaya tha [id: 78a710eb]"). Put citations at the end of relevant sentences or claims.
 3. UNDERSTANDING CONVERSATIONAL NUANCE & HUMOR:
    - For inside jokes, humor, and banter: Do NOT just search for the literal word "joke". Look at the playful banter, shared laughter ("hahaha", "😂", "lol", "lmao"), funny nicknames, tease remarks, sarcastic observations, and recurring humorous catchphrases. Explain what the funny moment or inside joke actually was, the context of what happened, who said what, and why it was funny between them.
    - For plans, trips, and meetups: Highlight the places mentioned, dates or timing, what was discussed, and the friends' reactions.
    - For relationship dynamics: Analyze who initiates more, the tone (supportive, teasing, chaotic, warm), and how they interact.
-4. MULTILINGUAL & CULTURAL FLUENCY:
-   - The chats frequently contain English, Roman Urdu, Urdu, Hindi, and Hinglish slang (e.g. "yrr", "bhai", "ajeeb", "gen1 / genuine", "mazak", "pagal", "scene on", "chal"). Understand these colloquialisms naturally and answer warmly in the same linguistic tone as the user's question.
-5. If the evidence genuinely doesn't cover the specific topic, provide what related context is visible and politely note what details are missing.
+4. If the evidence genuinely doesn't cover the specific topic, provide what related context is visible and politely note what details are missing.
 """
 
 class LLMService:
@@ -39,7 +46,7 @@ class LLMService:
         self.gemini_client = genai.Client(api_key=self.gemini_key) if self.gemini_key else None
         
         self.groq_model = getattr(settings, "GROQ_MODEL", "openai/gpt-oss-120b")
-        self.gemini_model = getattr(settings, "GEMINI_FLASH_MODEL", "gemini-2.5-flash")
+        self.gemini_model = getattr(settings, "GEMINI_FLASH_MODEL", "gemini-3.7-flash")
 
     async def stream_answer(
         self, 
@@ -56,9 +63,15 @@ class LLMService:
             formatted_evidence += f"\n--- Thread {block.get('thread_id', 'unknown')} ---\n"
             formatted_evidence += block.get("content", "") + "\n"
             
+        user_message_content = (
+            f"{formatted_evidence}\n\n"
+            f"USER QUESTION: {query}\n\n"
+            "MANDATORY INSTRUCTION: Respond in Latin alphabet ONLY (English or Roman Urdu matching the user's question). NEVER use Arabic/Perso-Arabic Urdu script."
+        )
+
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"{formatted_evidence}\n\nUSER QUESTION: {query}"}
+            {"role": "user", "content": user_message_content}
         ]
 
         # Try Groq first
@@ -86,7 +99,7 @@ class LLMService:
                 # Format for Gemini
                 contents = [
                     genai_types.Content(role="user", parts=[
-                        genai_types.Part.from_text(text=f"{SYSTEM_PROMPT}\n\n{formatted_evidence}\n\nUSER QUESTION: {query}")
+                        genai_types.Part.from_text(text=f"{SYSTEM_PROMPT}\n\n{user_message_content}")
                     ])
                 ]
                 

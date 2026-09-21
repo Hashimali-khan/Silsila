@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { AppNav } from "@/components/AppNav";
 import Link from "next/link";
@@ -46,13 +46,98 @@ const SEARCH_PHASES = [
   "Synthesizing relationship insights with verified citations...",
 ];
 
+// Helper to extract a stable 1-based citation index for clean, non-distracting reference badges
+function getCitationMap(text: string): Map<string, number> {
+  const map = new Map<string, number>();
+  if (!text) return map;
+  // Matches [id: 1234], [ id: 1234 ], [ id: 1234, 5678 ], ([id: 1234])
+  const citationRegex = /\[\s*id\s*:\s*([a-f0-9,\s]+)\s*\]/gi;
+  let match;
+  let counter = 1;
+  while ((match = citationRegex.exec(text)) !== null) {
+    const ids = match[1].split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+    for (const rawId of ids) {
+      const shortId = rawId.slice(0, 8);
+      if (!map.has(shortId)) {
+        map.set(shortId, counter++);
+      }
+    }
+  }
+  return map;
+}
+
+// Inline parser for bold, code, and interactive Gemini-style citation badges
+function renderInlineFormatting(
+  text: string,
+  onCitationClick: (id: string) => void,
+  citationMap: Map<string, number>
+): React.ReactNode[] {
+  // Regex to match citation patterns: [id: 12345], [ id: 12345 ], [id: 123, 456], ([id: 123])
+  const citationRegex = /(\(?\[\s*id\s*:\s*([a-f0-9,\s]+)\s*\]\)?)/gi;
+
+  const parts = text.split(citationRegex);
+  const result: React.ReactNode[] = [];
+
+  for (let idx = 0; idx < parts.length; idx++) {
+    const part = parts[idx];
+    if (!part) continue;
+
+    // Check if part is full citation match or contains "id:"
+    if (part.includes("id:") || part.includes("id :")) {
+      const match = /id\s*:\s*([a-f0-9,\s]+)/i.exec(part);
+      if (match) {
+        const ids = match[1].split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+        result.push(
+          <span key={`cite-${idx}`} className="inline-flex items-center gap-0.5 mx-0.5 align-baseline select-none">
+            {ids.map((singleId, idIndex) => {
+              const shortId = singleId.slice(0, 8);
+              const citeNum = citationMap.get(shortId) || 1;
+              return (
+                <button
+                  key={idIndex}
+                  type="button"
+                  onClick={() => onCitationClick(shortId)}
+                  title={`Source message [${citeNum}] · Click to view verified evidence`}
+                  className="inline-flex items-center justify-center min-w-[19px] h-[19px] px-1 rounded-full text-[10px] font-extrabold bg-orange-100 hover:bg-orange-600 text-orange-800 hover:text-white border border-orange-300/90 hover:border-orange-600 transition-all duration-150 cursor-pointer shadow-xs hover:scale-110 active:scale-95 -translate-y-0.5"
+                >
+                  <span className="leading-none">{citeNum}</span>
+                </button>
+              );
+            })}
+          </span>
+        );
+        continue;
+      }
+    }
+
+    // Parse bold formatting (**bold**)
+    const boldParts = part.split(/(\*\*.*?\*\*)/g);
+    for (let bIdx = 0; bIdx < boldParts.length; bIdx++) {
+      const bPart = boldParts[bIdx];
+      if (bPart.startsWith("**") && bPart.endsWith("**")) {
+        result.push(
+          <strong key={`bold-${idx}-${bIdx}`} className="font-bold text-slate-900">
+            {bPart.slice(2, -2)}
+          </strong>
+        );
+      } else if (bPart) {
+        result.push(bPart);
+      }
+    }
+  }
+
+  return result;
+}
+
 // Helper to parse and render Markdown + interactive citation badges
 function FormattedAnswer({
   content,
   onCitationClick,
+  citationMap,
 }: {
   content: string;
   onCitationClick: (citationId: string) => void;
+  citationMap: Map<string, number>;
 }) {
   if (!content) return null;
 
@@ -75,7 +160,7 @@ function FormattedAnswer({
             <tr className="bg-gradient-to-r from-orange-50 to-amber-50 border-b border-orange-200/80">
               {headerRow.map((h, i) => (
                 <th key={i} className="py-2.5 px-3.5 font-bold text-slate-800 tracking-wide">
-                  {renderInlineFormatting(h, onCitationClick)}
+                  {renderInlineFormatting(h, onCitationClick, citationMap)}
                 </th>
               ))}
             </tr>
@@ -85,7 +170,7 @@ function FormattedAnswer({
               <tr key={rIdx} className={rIdx % 2 === 0 ? "bg-white hover:bg-orange-50/40" : "bg-slate-50/50 hover:bg-orange-50/40"}>
                 {row.map((cell, cIdx) => (
                   <td key={cIdx} className="py-2.5 px-3.5 text-slate-700 leading-relaxed">
-                    {renderInlineFormatting(cell, onCitationClick)}
+                    {renderInlineFormatting(cell, onCitationClick, citationMap)}
                   </td>
                 ))}
               </tr>
@@ -120,7 +205,7 @@ function FormattedAnswer({
       elements.push(
         <h4 key={i} className="text-base md:text-lg font-extrabold text-slate-900 mt-4 mb-2 flex items-center gap-2">
           <span className="w-1.5 h-4 rounded-full bg-gradient-to-b from-orange-500 to-amber-500 inline-block" />
-          {renderInlineFormatting(trimmed.substring(4), onCitationClick)}
+          {renderInlineFormatting(trimmed.substring(4), onCitationClick, citationMap)}
         </h4>
       );
       continue;
@@ -129,7 +214,7 @@ function FormattedAnswer({
       elements.push(
         <h3 key={i} className="text-lg md:text-xl font-black text-slate-900 mt-5 mb-2.5 flex items-center gap-2">
           <span className="w-2 h-5 rounded-full bg-orange-600 inline-block" />
-          {renderInlineFormatting(trimmed.substring(3), onCitationClick)}
+          {renderInlineFormatting(trimmed.substring(3), onCitationClick, citationMap)}
         </h3>
       );
       continue;
@@ -142,7 +227,7 @@ function FormattedAnswer({
           key={i}
           className="my-3 p-3.5 rounded-xl bg-gradient-to-r from-orange-500/10 via-amber-500/10 to-transparent border-l-4 border-orange-500 font-bold text-slate-900 text-base md:text-lg shadow-sm"
         >
-          {renderInlineFormatting(trimmed.slice(2, -2), onCitationClick)}
+          {renderInlineFormatting(trimmed.slice(2, -2), onCitationClick, citationMap)}
         </div>
       );
       continue;
@@ -155,7 +240,7 @@ function FormattedAnswer({
           key={i}
           className="my-3 pl-4 py-2 border-l-4 border-orange-400 bg-orange-50/60 rounded-r-xl text-slate-800 italic text-sm md:text-base leading-relaxed"
         >
-          {renderInlineFormatting(trimmed.substring(2), onCitationClick)}
+          {renderInlineFormatting(trimmed.substring(2), onCitationClick, citationMap)}
         </blockquote>
       );
       continue;
@@ -166,7 +251,7 @@ function FormattedAnswer({
       elements.push(
         <div key={i} className="flex items-start gap-2.5 my-1.5 text-slate-700 text-sm md:text-base leading-relaxed">
           <span className="text-orange-500 font-black mt-1 text-xs select-none">●</span>
-          <div className="flex-1">{renderInlineFormatting(trimmed.substring(2), onCitationClick)}</div>
+          <div className="flex-1">{renderInlineFormatting(trimmed.substring(2), onCitationClick, citationMap)}</div>
         </div>
       );
       continue;
@@ -175,7 +260,7 @@ function FormattedAnswer({
     // Regular paragraph
     elements.push(
       <p key={i} className="my-1.5 text-slate-700 text-sm md:text-base leading-relaxed">
-        {renderInlineFormatting(trimmed, onCitationClick)}
+        {renderInlineFormatting(trimmed, onCitationClick, citationMap)}
       </p>
     );
   }
@@ -185,62 +270,6 @@ function FormattedAnswer({
   }
 
   return <div className="space-y-1">{elements}</div>;
-}
-
-// Inline parser for bold, code, and interactive [id: abc12345] citation badges
-function renderInlineFormatting(text: string, onCitationClick: (id: string) => void): React.ReactNode[] {
-  // Regex to match citation patterns like `([id: 12345])`, `[id: 12345]`, `[id: 12345, 67890]`
-  const citationRegex = /(\(?\[id:\s*([a-f0-9,\s]+)\]\)?)/gi;
-
-  const parts = text.split(citationRegex);
-  const result: React.ReactNode[] = [];
-
-  for (let idx = 0; idx < parts.length; idx++) {
-    const part = parts[idx];
-    if (!part) continue;
-
-    // Check if part is full citation match
-    if (part.startsWith("[id:") || part.startsWith("([id:") || (part.endsWith("]") && part.includes("id:"))) {
-      const match = /id:\s*([a-f0-9,\s]+)/i.exec(part);
-      if (match) {
-        const ids = match[1].split(",").map((s) => s.trim()).filter(Boolean);
-        result.push(
-          <span key={`cite-${idx}`} className="inline-flex items-center gap-1 mx-1 align-baseline">
-            {ids.map((singleId, idIndex) => (
-              <button
-                key={idIndex}
-                type="button"
-                onClick={() => onCitationClick(singleId)}
-                title={`Click to view verified chat evidence for message [id: ${singleId}]`}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-orange-100/90 text-orange-800 border border-orange-300 hover:bg-orange-500 hover:text-white hover:border-orange-500 transition-all duration-200 shadow-sm cursor-pointer hover:scale-105 active:scale-95"
-              >
-                <Hash size={11} className="opacity-75" />
-                <span>{singleId.slice(0, 8)}</span>
-              </button>
-            ))}
-          </span>
-        );
-        continue;
-      }
-    }
-
-    // Parse bold formatting (**bold**)
-    const boldParts = part.split(/(\*\*.*?\*\*)/g);
-    for (let bIdx = 0; bIdx < boldParts.length; bIdx++) {
-      const bPart = boldParts[bIdx];
-      if (bPart.startsWith("**") && bPart.endsWith("**")) {
-        result.push(
-          <strong key={`bold-${idx}-${bIdx}`} className="font-bold text-slate-900">
-            {bPart.slice(2, -2)}
-          </strong>
-        );
-      } else if (bPart) {
-        result.push(bPart);
-      }
-    }
-  }
-
-  return result;
 }
 
 import { ChatHeader } from "../ChatHeader";
@@ -433,6 +462,13 @@ export function QAClient({
       }
     }
   }
+
+  // Stable citation map mapping 8-char short IDs to 1-based reference numbers
+  const citationMap = useMemo(() => {
+    return "answer" in state && state.answer
+      ? getCitationMap(state.answer)
+      : new Map<string, number>();
+  }, [state]);
 
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -714,6 +750,7 @@ export function QAClient({
                     <FormattedAnswer
                       content={state.answer}
                       onCitationClick={handleCitationClick}
+                      citationMap={citationMap}
                     />
 
                     {state.status === "answering" && (
@@ -750,12 +787,14 @@ export function QAClient({
                       <div className="space-y-2.5 max-h-[500px] overflow-y-auto pr-1">
                         {evidenceMessages.map((msg: any, mIdx: number) => {
                           const mid = String(msg.id || "").toLowerCase();
+                          const shortId = mid.slice(0, 8);
+                          const citeNum = citationMap.get(shortId);
                           const isHighlighted = highlightedId && (mid.includes(highlightedId) || highlightedId.includes(mid));
 
                           return (
                             <div
                               key={mIdx}
-                              id={`evidence-msg-${mid.slice(0, 8)}`}
+                              id={`evidence-msg-${shortId}`}
                               className={`p-3 rounded-xl border transition-all duration-300 ${
                                 isHighlighted
                                   ? "bg-orange-50/90 border-orange-400 ring-2 ring-orange-400/40 shadow-md"
@@ -764,6 +803,14 @@ export function QAClient({
                             >
                               <div className="flex items-center justify-between mb-1.5 text-xs">
                                 <div className="flex items-center gap-2">
+                                  {citeNum && (
+                                    <span
+                                      className="w-5 h-5 rounded-full bg-orange-500 text-white font-extrabold flex items-center justify-center text-[10px] shadow-xs select-none"
+                                      title={`Referenced as [${citeNum}] in synthesized answer`}
+                                    >
+                                      {citeNum}
+                                    </span>
+                                  )}
                                   <span className="w-5 h-5 rounded-full bg-slate-300 text-slate-700 font-bold flex items-center justify-center text-[10px]">
                                     {(msg.sender_name || "U")[0].toUpperCase()}
                                   </span>
@@ -773,7 +820,7 @@ export function QAClient({
                                 <div className="flex items-center gap-2 text-slate-400">
                                   <span>{msg.timestamp ? new Date(msg.timestamp).toLocaleString([], { dateStyle: "short", timeStyle: "short" }) : ""}</span>
                                   <span className="font-mono text-[10px] px-1.5 py-0.5 rounded-md bg-white border border-slate-200 text-slate-500">
-                                    id: {String(msg.id).slice(0, 8)}
+                                    {citeNum ? `Ref [${citeNum}]` : `id: ${shortId}`}
                                   </span>
                                 </div>
                               </div>

@@ -312,8 +312,8 @@ def upgrade() -> None:
     BEGIN
         IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'own_data' AND tablename = 'message_threads') THEN
             CREATE POLICY "own_data" ON public.message_threads FOR ALL USING (
-                message_id IN (
-                    SELECT id FROM public.messages WHERE user_id = current_setting('app.user_id', true)
+                EXISTS (
+                    SELECT 1 FROM public.messages WHERE id = message_id AND user_id = current_setting('app.user_id', true)
                 )
             );
         END IF;

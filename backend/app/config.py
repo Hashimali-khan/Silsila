@@ -37,8 +37,8 @@ class Settings(BaseSettings):
     GROQ_MODEL: str = "openai/gpt-oss-120b"
 
     # Gemini — fallback LLM + entity suggestion only
-    GEMINI_API_KEY: str
-    GEMINI_FLASH_MODEL: str = "gemini-2.0-flash"
+    GEMINI_API_KEY: str | None = None
+    GEMINI_FLASH_MODEL: str = "gemini-3.7-flash"
 
     # Sentry (optional — Phase 6)
     SENTRY_DSN: str = ""
