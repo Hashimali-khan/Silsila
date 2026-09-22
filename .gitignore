@@ -162,3 +162,6 @@ supabase/seed.sql            # may contain real data
 
 # ── Video Generation ──────────────────────────────────────────
 brag-output-*/
+
+# ── Fixes ─────────────────────────────────────────────────────
+!frontend/lib/
