@@ -159,3 +159,6 @@ desktop.ini
 # ── Supabase (legacy — not used in ADR stack) ─────────────────
 supabase/.temp/
 supabase/seed.sql            # may contain real data
+
+# ── Video Generation ──────────────────────────────────────────
+brag-output-*/

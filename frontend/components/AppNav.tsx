@@ -18,28 +18,15 @@ export function AppNav() {
       <div className="max-w-7xl mx-auto h-16 px-4 sm:px-6 lg:px-8 flex items-center justify-between">
         {/* Brand Logo */}
         <Link href="/" className="flex items-center gap-3 group">
-          <div className="w-10 h-10 rounded-[12px] bg-gradient-to-br from-primary to-amber-accent flex items-center justify-center text-white shadow-warm-md group-hover:shadow-warm-lg transition-all duration-300 transform group-hover:-rotate-3 group-hover:scale-105">
-            <svg
-              className="w-5 h-5 stroke-white fill-none"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2.5"
-              viewBox="0 0 24 24"
-            >
-              <circle cx="9" cy="12" r="5" />
-              <circle cx="15" cy="12" r="5" />
-            </svg>
-          </div>
+          <img 
+            src="/logo.jpg" 
+            alt="Silsila AI Logo" 
+            className="w-10 h-10 rounded-[12px] object-cover shadow-warm-md group-hover:shadow-warm-lg transition-all duration-300 transform group-hover:-rotate-3 group-hover:scale-105" 
+          />
           <div className="flex items-center gap-3">
             <span className="font-display font-black text-2xl tracking-tighter text-on-surface">
               Silsila <span className="text-primary opacity-80 font-extrabold">AI</span>
             </span>
-            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-muted/50 border border-surface-border shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)] backdrop-blur-sm">
-              <span className="w-1.5 h-1.5 rounded-full bg-primary"></span>
-              <span className="text-[10px] font-extrabold tracking-widest uppercase text-on-surface-variant font-body">
-                Relationship AI
-              </span>
-            </div>
           </div>
         </Link>
 

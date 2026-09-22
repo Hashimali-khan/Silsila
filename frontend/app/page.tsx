@@ -70,21 +70,14 @@ function PremiumFooter() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 lg:gap-8 mb-12">
           <div className="lg:col-span-2">
             <div className="flex items-center gap-3 group cursor-pointer mb-6">
-              <div className="w-10 h-10 rounded-[12px] bg-gradient-to-br from-primary to-amber-accent flex items-center justify-center text-white shadow-warm-md group-hover:shadow-warm-lg transition-all duration-300 transform group-hover:-rotate-3 group-hover:scale-105">
-                <svg
-                  className="w-5 h-5 stroke-white fill-none"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2.5"
-                  viewBox="0 0 24 24"
-                >
-                  <circle cx="9" cy="12" r="5" />
-                  <circle cx="15" cy="12" r="5" />
-                </svg>
-              </div>
+              <img 
+                src="/logo.jpg" 
+                alt="Silsila AI Logo" 
+                className="w-10 h-10 rounded-[12px] object-cover shadow-warm-md group-hover:shadow-warm-lg transition-all duration-300 transform group-hover:-rotate-3 group-hover:scale-105" 
+              />
               <div className="flex items-center gap-2">
                 <span className="font-display font-black text-2xl tracking-tighter text-white block leading-tight">Silsila <span className="text-primary opacity-90 font-extrabold">AI</span></span>
-                <span className="text-xs text-slate-400 font-medium tracking-wide border-l border-slate-700 pl-2 ml-1">Your relationships, understood.</span>
+                <span className="text-xs text-slate-400 font-medium tracking-wide border-l border-slate-700 pl-2 ml-1">Uncover the story of your connections.</span>
               </div>
             </div>
             <p className="text-slate-300 text-sm leading-relaxed max-w-sm mb-6">
