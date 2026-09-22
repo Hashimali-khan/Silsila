@@ -6,7 +6,7 @@ const cspHeader = `
     style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
     img-src 'self' blob: data: https://img.clerk.com;
     font-src 'self' https://fonts.gstatic.com;
-    connect-src 'self' https://*.clerk.accounts.dev http://localhost:8000 https://clerk-telemetry.com;
+    connect-src 'self' https://*.clerk.accounts.dev ${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'} https://clerk-telemetry.com;
     worker-src 'self' blob:;
     object-src 'none';
     base-uri 'self';
