@@ -27,40 +27,40 @@ const BACKEND_URL =
 
 const CARD_THEMES = [
   {
-    gradient: "from-orange-500/10 via-amber-500/5 to-transparent",
+    gradient: "",
     accent: "#ea580c",
-    badgeBg: "bg-orange-50 text-orange-700 border-orange-200/80",
-    avatarBg: "bg-gradient-to-br from-orange-500 to-amber-500 text-white",
+    badgeBg: "bg-orange-50 text-orange-800 border-orange-200",
+    avatarBg: "bg-orange-600 text-white",
   },
   {
-    gradient: "from-blue-500/10 via-sky-500/5 to-transparent",
+    gradient: "",
     accent: "#0284c7",
-    badgeBg: "bg-sky-50 text-sky-700 border-sky-200/80",
-    avatarBg: "bg-gradient-to-br from-blue-500 to-cyan-500 text-white",
+    badgeBg: "bg-sky-50 text-sky-800 border-sky-200",
+    avatarBg: "bg-sky-600 text-white",
   },
   {
-    gradient: "from-emerald-500/10 via-teal-500/5 to-transparent",
+    gradient: "",
     accent: "#059669",
-    badgeBg: "bg-emerald-50 text-emerald-700 border-emerald-200/80",
-    avatarBg: "bg-gradient-to-br from-emerald-500 to-teal-500 text-white",
+    badgeBg: "bg-emerald-50 text-emerald-800 border-emerald-200",
+    avatarBg: "bg-emerald-600 text-white",
   },
   {
-    gradient: "from-purple-500/10 via-indigo-500/5 to-transparent",
+    gradient: "",
     accent: "#7c3aed",
-    badgeBg: "bg-purple-50 text-purple-700 border-purple-200/80",
-    avatarBg: "bg-gradient-to-br from-purple-500 to-indigo-500 text-white",
+    badgeBg: "bg-purple-50 text-purple-800 border-purple-200",
+    avatarBg: "bg-purple-600 text-white",
   },
   {
-    gradient: "from-rose-500/10 via-pink-500/5 to-transparent",
+    gradient: "",
     accent: "#e11d48",
-    badgeBg: "bg-rose-50 text-rose-700 border-rose-200/80",
-    avatarBg: "bg-gradient-to-br from-rose-500 to-pink-500 text-white",
+    badgeBg: "bg-rose-50 text-rose-800 border-rose-200",
+    avatarBg: "bg-rose-600 text-white",
   },
   {
-    gradient: "from-amber-500/10 via-yellow-500/5 to-transparent",
+    gradient: "",
     accent: "#d97706",
-    badgeBg: "bg-amber-50 text-amber-800 border-amber-200/80",
-    avatarBg: "bg-gradient-to-br from-amber-500 to-yellow-500 text-white",
+    badgeBg: "bg-amber-50 text-amber-900 border-amber-200",
+    avatarBg: "bg-amber-600 text-white",
   },
 ];
 
@@ -171,13 +171,13 @@ export function DashboardClient({ initialChats }: DashboardClientProps) {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold text-orange-700 bg-orange-100/80 border border-orange-200/80 mb-2">
-            <span className="w-2 h-2 rounded-full bg-orange-500 animate-ping" />
+            <span className="w-2 h-2 rounded-full bg-orange-500" />
             <span>Interactive Archive Engine</span>
           </div>
 
-          <h2 className="font-display font-extrabold text-3xl sm:text-5xl text-slate-900 tracking-tight">
+          <h1 className="font-display font-extrabold text-3xl sm:text-5xl text-slate-900 tracking-tight">
             Your Conversations
-          </h2>
+          </h1>
           <p className="text-base sm:text-lg text-slate-500 mt-2 max-w-2xl font-medium">
             Search, ask questions with AI memory, and relive relationship milestones across your chats.
           </p>
@@ -207,7 +207,7 @@ export function DashboardClient({ initialChats }: DashboardClientProps) {
             <div className="text-2xl sm:text-3xl font-black text-slate-900 font-display">
               {chats.length}
             </div>
-            <div className="text-[11px] text-slate-400 mt-1 font-medium">Active Archives</div>
+            <div className="text-[11px] text-slate-500 mt-1 font-medium">Active Archives</div>
           </motion.div>
 
           <motion.div
@@ -221,7 +221,7 @@ export function DashboardClient({ initialChats }: DashboardClientProps) {
             <div className="text-2xl sm:text-3xl font-black text-slate-900 font-display">
               {formatNumber(totalMessages)}
             </div>
-            <div className="text-[11px] text-slate-400 mt-1 font-medium">Indexed & Searchable</div>
+            <div className="text-[11px] text-slate-500 mt-1 font-medium">Indexed & Searchable</div>
           </motion.div>
 
           <motion.div
@@ -235,7 +235,7 @@ export function DashboardClient({ initialChats }: DashboardClientProps) {
             <div className="text-2xl sm:text-3xl font-black text-slate-900 font-display">
               {totalParticipants}
             </div>
-            <div className="text-[11px] text-slate-400 mt-1 font-medium">Participants Identified</div>
+            <div className="text-[11px] text-slate-500 mt-1 font-medium">Participants Identified</div>
           </motion.div>
 
           <motion.div
@@ -249,7 +249,7 @@ export function DashboardClient({ initialChats }: DashboardClientProps) {
             <div className="text-2xl sm:text-3xl font-black text-emerald-600 font-display">
               100%
             </div>
-            <div className="text-[11px] text-slate-400 mt-1 font-medium">Encrypted & Private</div>
+            <div className="text-[11px] text-slate-500 mt-1 font-medium">Encrypted & Private</div>
           </motion.div>
         </div>
       )}
@@ -291,7 +291,7 @@ export function DashboardClient({ initialChats }: DashboardClientProps) {
               onClick={() => setSortBy("recent")}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 sortBy === "recent"
-                  ? "bg-white text-orange-600 shadow-2xs border border-orange-200/80"
+                  ? "bg-slate-900 text-white shadow-2xs border border-slate-900"
                   : "text-slate-500 hover:text-slate-900 hover:bg-white/60"
               }`}
             >
@@ -303,7 +303,7 @@ export function DashboardClient({ initialChats }: DashboardClientProps) {
               onClick={() => setSortBy("messages")}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 sortBy === "messages"
-                  ? "bg-white text-orange-600 shadow-2xs border border-orange-200/80"
+                  ? "bg-slate-900 text-white shadow-2xs border border-slate-900"
                   : "text-slate-500 hover:text-slate-900 hover:bg-white/60"
               }`}
             >
@@ -315,7 +315,7 @@ export function DashboardClient({ initialChats }: DashboardClientProps) {
               onClick={() => setSortBy("name")}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 sortBy === "name"
-                  ? "bg-white text-orange-600 shadow-2xs border border-orange-200/80"
+                  ? "bg-slate-900 text-white shadow-2xs border border-slate-900"
                   : "text-slate-500 hover:text-slate-900 hover:bg-white/60"
               }`}
             >
@@ -392,10 +392,7 @@ export function DashboardClient({ initialChats }: DashboardClientProps) {
                   whileHover={{ y: -6 }}
                   className="group relative flex flex-col bg-white rounded-3xl border border-slate-200/90 shadow-2xs hover:shadow-xl hover:border-slate-300 transition-all duration-300 overflow-hidden"
                 >
-                  {/* Top Ambient Accent Gradient */}
-                  <div
-                    className={`absolute inset-x-0 top-0 h-32 bg-gradient-to-b ${theme.gradient} pointer-events-none opacity-80 group-hover:opacity-100 transition-opacity`}
-                  />
+                  {/* Top Ambient Accent Gradient Removed */}
 
                   {/* Card Header Row */}
                   <div className="p-6 pb-4 relative z-10 flex-1 flex flex-col">
@@ -450,9 +447,9 @@ export function DashboardClient({ initialChats }: DashboardClientProps) {
                     </div>
 
                     {/* Stats Strip */}
-                    <div className="grid grid-cols-2 gap-2 p-3 rounded-2xl bg-slate-50/80 border border-slate-100 my-2">
+                    <div className="grid grid-cols-2 gap-2 p-3 my-2 border-t border-b border-slate-100">
                       <div className="px-2 py-1">
-                        <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-0.5">
+                        <div className="text-xs uppercase tracking-wider font-bold text-slate-500 mb-1">
                           Messages
                         </div>
                         <div className="text-base font-extrabold text-slate-900 font-display">
@@ -461,7 +458,7 @@ export function DashboardClient({ initialChats }: DashboardClientProps) {
                       </div>
 
                       <div className="px-2 py-1 border-l border-slate-200/70">
-                        <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-0.5">
+                        <div className="text-xs uppercase tracking-wider font-bold text-slate-500 mb-1">
                           Started
                         </div>
                         <div className="text-xs sm:text-sm font-bold text-slate-700 truncate">
@@ -489,7 +486,7 @@ export function DashboardClient({ initialChats }: DashboardClientProps) {
                         </Link>
                       </div>
 
-                      <div className="text-[11px] font-medium text-slate-400">
+                      <div className="text-xs font-medium text-slate-600">
                         {chat.last_message_at ? formatDateShort(chat.last_message_at) : ""}
                       </div>
                     </div>
@@ -498,7 +495,7 @@ export function DashboardClient({ initialChats }: DashboardClientProps) {
                   {/* Primary Enter Link Banner */}
                   <Link
                     href={`/chat/${chat.id}`}
-                    className="px-6 py-3.5 bg-slate-50/90 group-hover:bg-gradient-to-r group-hover:from-orange-600 group-hover:to-amber-500 border-t border-slate-100 group-hover:border-transparent flex items-center justify-between text-xs font-bold text-slate-700 group-hover:text-white transition-all duration-300"
+                    className="px-6 py-3.5 bg-slate-50/90 group-hover:bg-slate-900 border-t border-slate-200 group-hover:border-transparent flex items-center justify-between text-xs font-bold text-slate-700 group-hover:text-white transition-all duration-300"
                   >
                     <span>Explore Messages & Archive</span>
                     <ArrowRight

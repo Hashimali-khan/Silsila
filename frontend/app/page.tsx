@@ -87,7 +87,7 @@ function PremiumFooter() {
                 <span className="text-xs text-slate-400 font-medium tracking-wide border-l border-slate-700 pl-2 ml-1">Your relationships, understood.</span>
               </div>
             </div>
-            <p className="text-slate-400 text-sm leading-relaxed max-w-sm mb-6">
+            <p className="text-slate-300 text-sm leading-relaxed max-w-sm mb-6">
               Turn endless WhatsApp group banter, family voice notes, and late-night chats into a living, searchable memory engine.
             </p>
             <div className="flex items-center gap-4">
@@ -101,21 +101,21 @@ function PremiumFooter() {
           </div>
           
           <div>
-            <h4 className="font-display font-bold text-white mb-4 tracking-wide">Product</h4>
+            <h3 className="font-display font-bold text-white mb-4 tracking-wide">Product</h3>
             <ul className="space-y-3">
-              <li><a href="#" className="text-slate-400 hover:text-white transition-colors text-sm font-medium">Dashboard</a></li>
-              <li><a href="/upload" className="text-slate-400 hover:text-white transition-colors text-sm font-medium">Upload Chat</a></li>
-              <li><a href="#" className="text-slate-400 hover:text-white transition-colors text-sm font-medium">Privacy Architecture</a></li>
-              <li><a href="#" className="text-slate-400 hover:text-white transition-colors text-sm font-medium">Security Details</a></li>
+              <li><a href="#" className="text-slate-300 hover:text-white transition-colors text-sm font-medium">Dashboard</a></li>
+              <li><a href="/upload" className="text-slate-300 hover:text-white transition-colors text-sm font-medium">Upload Chat</a></li>
+              <li><a href="#" className="text-slate-300 hover:text-white transition-colors text-sm font-medium">Privacy Architecture</a></li>
+              <li><a href="#" className="text-slate-300 hover:text-white transition-colors text-sm font-medium">Security Details</a></li>
             </ul>
           </div>
           
           <div>
-            <h4 className="font-display font-bold text-white mb-4 tracking-wide">Connect</h4>
+            <h3 className="font-display font-bold text-white mb-4 tracking-wide">Connect</h3>
             <ul className="space-y-3">
-              <li><a href="#" className="text-slate-400 hover:text-white transition-colors text-sm font-medium flex items-center gap-2"><Headphones size={18} /> Help Center</a></li>
-              <li><a href="#" className="text-slate-400 hover:text-white transition-colors text-sm font-medium flex items-center gap-2"><Bug size={18} /> Report Issue</a></li>
-              <li><a href="#" className="text-slate-400 hover:text-white transition-colors text-sm font-medium flex items-center gap-2"><Mail size={18} /> Contact Us</a></li>
+              <li><a href="#" className="text-slate-300 hover:text-white transition-colors text-sm font-medium flex items-center gap-2"><Headphones size={18} /> Help Center</a></li>
+              <li><a href="#" className="text-slate-300 hover:text-white transition-colors text-sm font-medium flex items-center gap-2"><Bug size={18} /> Report Issue</a></li>
+              <li><a href="#" className="text-slate-300 hover:text-white transition-colors text-sm font-medium flex items-center gap-2"><Mail size={18} /> Contact Us</a></li>
             </ul>
           </div>
         </div>

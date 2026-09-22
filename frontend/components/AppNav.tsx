@@ -35,7 +35,7 @@ export function AppNav() {
               Silsila <span className="text-primary opacity-80 font-extrabold">AI</span>
             </span>
             <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-muted/50 border border-surface-border shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)] backdrop-blur-sm">
-              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+              <span className="w-1.5 h-1.5 rounded-full bg-primary"></span>
               <span className="text-[10px] font-extrabold tracking-widest uppercase text-on-surface-variant font-body">
                 Relationship AI
               </span>
